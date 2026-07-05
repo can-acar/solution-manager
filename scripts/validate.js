@@ -5,6 +5,7 @@ const path = require('path');
 const files = [
   'src/extension.js',
   'src/projectActions.js',
+  'src/projectPropertiesView.js',
   'src/solutionTreeProvider.js',
   'src/terminalRunner.js',
   'src/workspaceScanner.js',

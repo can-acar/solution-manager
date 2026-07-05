@@ -147,8 +147,12 @@ class SolutionTreeProvider {
     item.description = node.description;
     item.tooltip = node.tooltip || node.item?.path || node.uri?.fsPath || node.label;
     item.contextValue = node.contextValue;
-    item.iconPath = getIcon(node);
     item.resourceUri = node.resourceUri;
+    const icon = getIcon(node);
+
+    if (icon) {
+      item.iconPath = icon;
+    }
 
     if (node.kind === 'file') {
       item.command = {
@@ -453,16 +457,15 @@ class SolutionTreeProvider {
     }
 
     const solutionName = getActiveSolutionName(state);
-    const title = `Solution Manager: ${solutionName}`;
 
     try {
-      this.treeView.title = title;
+      this.treeView.title = solutionName;
     } catch {
       // Older VS Code hosts may not allow dynamic view titles.
     }
 
     try {
-      this.treeView.description = solutionName;
+      this.treeView.description = undefined;
     } catch {
       // Description is best-effort only.
     }
@@ -693,7 +696,7 @@ function getIcon(node) {
     case 'dependencyItem':
       return getDependencyItemIcon(node.groupKind);
     case 'file':
-      return getFileIcon(node.uri);
+      return undefined;
     default:
       return new vscode.ThemeIcon('info');
   }
@@ -862,24 +865,6 @@ function getDependencyItemIcon(groupKind) {
     default:
       return new vscode.ThemeIcon('symbol-property');
   }
-}
-
-function getFileIcon(uri) {
-  const extension = path.extname(uri.fsPath).toLowerCase();
-
-  if (extension === '.cs') {
-    return new vscode.ThemeIcon('symbol-class');
-  }
-
-  if (extension === '.json') {
-    return new vscode.ThemeIcon('json');
-  }
-
-  if (extension === '.xml' || extension === '.props' || extension === '.targets') {
-    return new vscode.ThemeIcon('code');
-  }
-
-  return new vscode.ThemeIcon('file');
 }
 
 function shouldSkipDirectoryEntry(name, type) {

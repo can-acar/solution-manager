@@ -63,7 +63,7 @@
       "activitybar": [
         {
           "id": "solutionManager",
-          "title": "Solution Manager",
+          "title": "Solution",
           "icon": "media/activity-icon.svg"
         }
       ]
@@ -72,7 +72,7 @@
       "solutionManager": [
         {
           "id": "solutionManager.solutionView",
-          "name": "Solution Manager: Solution"
+          "name": "Solution"
         }
       ]
     },
