@@ -1,0 +1,682 @@
+{
+  "name": "solution-manager",
+  "displayName": "Solution Manager",
+  "description": "Rider-style Solution view for .sln and .slnx files, projects, folders, and files.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:solutionManager.solutionView",
+    "onCommand:solutionManager.open",
+    "onCommand:solutionManager.openSolutionFile",
+    "onCommand:solutionManager.refresh",
+    "onCommand:solutionManager.scanWorkspace",
+    "onCommand:solutionManager.addProject",
+    "onCommand:solutionManager.build",
+    "onCommand:solutionManager.test",
+    "onCommand:solutionManager.openTreeItem",
+    "onCommand:solutionManager.buildTreeItem",
+    "onCommand:solutionManager.testTreeItem",
+    "onCommand:solutionManager.addNewCSharpClass",
+    "onCommand:solutionManager.addNewFile",
+    "onCommand:solutionManager.addNewFolder",
+    "onCommand:solutionManager.addProjectReference",
+    "onCommand:solutionManager.manageNuGetPackages",
+    "onCommand:solutionManager.unloadProject",
+    "onCommand:solutionManager.reloadProject",
+    "onCommand:solutionManager.efAddMigration",
+    "onCommand:solutionManager.efRemoveMigration",
+    "onCommand:solutionManager.efUpdateDatabase",
+    "onCommand:solutionManager.efScriptMigration",
+    "onCommand:solutionManager.buildSelectedProjects",
+    "onCommand:solutionManager.runUnitTest",
+    "onCommand:solutionManager.publishProject",
+    "onCommand:solutionManager.restoreProject",
+    "onCommand:solutionManager.cleanProject",
+    "onCommand:solutionManager.rebuildProject",
+    "onCommand:solutionManager.packProject",
+    "onCommand:solutionManager.gitStatusProject",
+    "onCommand:solutionManager.gitDiffProject",
+    "onCommand:solutionManager.gitLogProject",
+    "onCommand:solutionManager.copyFullPath",
+    "onCommand:solutionManager.copyRelativePath",
+    "onCommand:solutionManager.copyProjectReferenceXml",
+    "onCommand:solutionManager.copyProjectName",
+    "onCommand:solutionManager.openInEditor",
+    "onCommand:solutionManager.openInExplorer",
+    "onCommand:solutionManager.openInTerminal",
+    "onCommand:solutionManager.showProperties"
+  ],
+  "main": "./src/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "solutionManager",
+          "title": "Solution Manager",
+          "icon": "media/activity-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "solutionManager": [
+        {
+          "id": "solutionManager.solutionView",
+          "name": "Solution Manager: Solution"
+        }
+      ]
+    },
+    "submenus": [
+      {
+        "id": "solutionManager.project.add",
+        "label": "Add"
+      },
+      {
+        "id": "solutionManager.project.ef",
+        "label": "Entity Framework Core"
+      },
+      {
+        "id": "solutionManager.project.advancedBuild",
+        "label": "Advanced Build Actions"
+      },
+      {
+        "id": "solutionManager.project.git",
+        "label": "Git"
+      },
+      {
+        "id": "solutionManager.project.copy",
+        "label": "Copy Path/Reference..."
+      },
+      {
+        "id": "solutionManager.project.openIn",
+        "label": "Open In"
+      }
+    ],
+    "commands": [
+      {
+        "command": "solutionManager.open",
+        "title": "Solution Manager: Focus Solution View",
+        "category": "Solution Manager",
+        "icon": "$(layout-sidebar-left)"
+      },
+      {
+        "command": "solutionManager.openSolutionFile",
+        "title": "Solution Manager: Open Solution File",
+        "category": "Solution Manager",
+        "icon": "$(file-symlink-file)"
+      },
+      {
+        "command": "solutionManager.refresh",
+        "title": "Solution Manager: Refresh",
+        "category": "Solution Manager",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "solutionManager.scanWorkspace",
+        "title": "Solution Manager: Scan Workspace",
+        "category": "Solution Manager",
+        "icon": "$(search)"
+      },
+      {
+        "command": "solutionManager.addProject",
+        "title": "Solution Manager: Add Project",
+        "category": "Solution Manager",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "solutionManager.build",
+        "title": "Solution Manager: Build",
+        "category": "Solution Manager",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "solutionManager.test",
+        "title": "Solution Manager: Test",
+        "category": "Solution Manager",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "solutionManager.openTreeItem",
+        "title": "Open",
+        "category": "Solution Manager",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "solutionManager.buildTreeItem",
+        "title": "Build",
+        "category": "Solution Manager",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "solutionManager.testTreeItem",
+        "title": "Test",
+        "category": "Solution Manager",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "solutionManager.addNewCSharpClass",
+        "title": "New C# Class...",
+        "category": "Solution Manager",
+        "icon": "$(symbol-class)"
+      },
+      {
+        "command": "solutionManager.addNewFile",
+        "title": "New File...",
+        "category": "Solution Manager",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "solutionManager.addNewFolder",
+        "title": "New Folder...",
+        "category": "Solution Manager",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "solutionManager.addProjectReference",
+        "title": "Add Project Reference...",
+        "category": "Solution Manager",
+        "icon": "$(references)"
+      },
+      {
+        "command": "solutionManager.manageNuGetPackages",
+        "title": "Manage NuGet Packages",
+        "category": "Solution Manager",
+        "icon": "$(package)"
+      },
+      {
+        "command": "solutionManager.unloadProject",
+        "title": "Unload Project",
+        "category": "Solution Manager",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "solutionManager.reloadProject",
+        "title": "Reload Project",
+        "category": "Solution Manager",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "solutionManager.efAddMigration",
+        "title": "Add Migration...",
+        "category": "Solution Manager",
+        "icon": "$(database)"
+      },
+      {
+        "command": "solutionManager.efRemoveMigration",
+        "title": "Remove Last Migration",
+        "category": "Solution Manager",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "solutionManager.efUpdateDatabase",
+        "title": "Update Database",
+        "category": "Solution Manager",
+        "icon": "$(database)"
+      },
+      {
+        "command": "solutionManager.efScriptMigration",
+        "title": "Script Migration",
+        "category": "Solution Manager",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "solutionManager.buildSelectedProjects",
+        "title": "Build Selected Projects",
+        "category": "Solution Manager",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "solutionManager.runUnitTest",
+        "title": "Run Unit Test",
+        "category": "Solution Manager",
+        "icon": "$(run)"
+      },
+      {
+        "command": "solutionManager.publishProject",
+        "title": "Publish...",
+        "category": "Solution Manager",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "solutionManager.restoreProject",
+        "title": "Restore",
+        "category": "Solution Manager",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "solutionManager.cleanProject",
+        "title": "Clean",
+        "category": "Solution Manager",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "solutionManager.rebuildProject",
+        "title": "Rebuild",
+        "category": "Solution Manager",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "solutionManager.packProject",
+        "title": "Pack",
+        "category": "Solution Manager",
+        "icon": "$(package)"
+      },
+      {
+        "command": "solutionManager.gitStatusProject",
+        "title": "Status for Project",
+        "category": "Solution Manager",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "solutionManager.gitDiffProject",
+        "title": "Diff for Project",
+        "category": "Solution Manager",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "solutionManager.gitLogProject",
+        "title": "Log for Project",
+        "category": "Solution Manager",
+        "icon": "$(history)"
+      },
+      {
+        "command": "solutionManager.copyFullPath",
+        "title": "Copy Full Path",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.copyRelativePath",
+        "title": "Copy Relative Path",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.copyProjectReferenceXml",
+        "title": "Copy Project Reference XML",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.copyProjectName",
+        "title": "Copy Project Name",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.openInEditor",
+        "title": "Editor",
+        "category": "Solution Manager",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "solutionManager.openInExplorer",
+        "title": "Explorer/Finder",
+        "category": "Solution Manager",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "solutionManager.openInTerminal",
+        "title": "Integrated Terminal",
+        "category": "Solution Manager",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "solutionManager.showProperties",
+        "title": "Properties...",
+        "category": "Solution Manager",
+        "icon": "$(settings-gear)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "solutionManager.refresh",
+          "when": "view == solutionManager.solutionView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "solutionManager.addProject",
+          "when": "view == solutionManager.solutionView",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "submenu": "solutionManager.project.add",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded)",
+          "group": "1_add@1"
+        },
+        {
+          "command": "solutionManager.manageNuGetPackages",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded)",
+          "group": "1_add@2"
+        },
+        {
+          "command": "solutionManager.unloadProject",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded)",
+          "group": "1_add@3"
+        },
+        {
+          "command": "solutionManager.reloadProject",
+          "when": "view == solutionManager.solutionView && viewItem == projectUnloaded",
+          "group": "1_add@4"
+        },
+        {
+          "submenu": "solutionManager.project.ef",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded)",
+          "group": "2_ef@1"
+        },
+        {
+          "command": "solutionManager.buildSelectedProjects",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded)",
+          "group": "3_build@1"
+        },
+        {
+          "command": "solutionManager.runUnitTest",
+          "when": "view == solutionManager.solutionView && viewItem == projectTestLoaded",
+          "group": "3_build@2"
+        },
+        {
+          "command": "solutionManager.publishProject",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded)",
+          "group": "3_build@3"
+        },
+        {
+          "submenu": "solutionManager.project.advancedBuild",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded)",
+          "group": "3_build@4"
+        },
+        {
+          "submenu": "solutionManager.project.git",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded || viewItem == projectUnloaded)",
+          "group": "4_tools@1"
+        },
+        {
+          "submenu": "solutionManager.project.copy",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded || viewItem == projectUnloaded)",
+          "group": "5_open@1"
+        },
+        {
+          "submenu": "solutionManager.project.openIn",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded || viewItem == projectUnloaded)",
+          "group": "5_open@2"
+        },
+        {
+          "command": "solutionManager.showProperties",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded || viewItem == projectUnloaded)",
+          "group": "6_properties@1"
+        },
+        {
+          "command": "solutionManager.openTreeItem",
+          "when": "view == solutionManager.solutionView && (viewItem == solution || viewItem == file)",
+          "group": "inline@1"
+        }
+      ],
+      "solutionManager.project.add": [
+        {
+          "command": "solutionManager.addNewCSharpClass",
+          "group": "1_new@1"
+        },
+        {
+          "command": "solutionManager.addNewFile",
+          "group": "1_new@2"
+        },
+        {
+          "command": "solutionManager.addNewFolder",
+          "group": "1_new@3"
+        },
+        {
+          "command": "solutionManager.addProjectReference",
+          "group": "2_reference@1"
+        }
+      ],
+      "solutionManager.project.ef": [
+        {
+          "command": "solutionManager.efAddMigration",
+          "group": "1_migrations@1"
+        },
+        {
+          "command": "solutionManager.efRemoveMigration",
+          "group": "1_migrations@2"
+        },
+        {
+          "command": "solutionManager.efUpdateDatabase",
+          "group": "2_database@1"
+        },
+        {
+          "command": "solutionManager.efScriptMigration",
+          "group": "2_database@2"
+        }
+      ],
+      "solutionManager.project.advancedBuild": [
+        {
+          "command": "solutionManager.restoreProject",
+          "group": "1_build@1"
+        },
+        {
+          "command": "solutionManager.cleanProject",
+          "group": "1_build@2"
+        },
+        {
+          "command": "solutionManager.rebuildProject",
+          "group": "1_build@3"
+        },
+        {
+          "command": "solutionManager.packProject",
+          "group": "2_pack@1"
+        }
+      ],
+      "solutionManager.project.git": [
+        {
+          "command": "solutionManager.gitStatusProject",
+          "group": "1_git@1"
+        },
+        {
+          "command": "solutionManager.gitDiffProject",
+          "group": "1_git@2"
+        },
+        {
+          "command": "solutionManager.gitLogProject",
+          "group": "1_git@3"
+        }
+      ],
+      "solutionManager.project.copy": [
+        {
+          "command": "solutionManager.copyFullPath",
+          "group": "1_copy@1"
+        },
+        {
+          "command": "solutionManager.copyRelativePath",
+          "group": "1_copy@2"
+        },
+        {
+          "command": "solutionManager.copyProjectReferenceXml",
+          "group": "1_copy@3"
+        },
+        {
+          "command": "solutionManager.copyProjectName",
+          "group": "1_copy@4"
+        }
+      ],
+      "solutionManager.project.openIn": [
+        {
+          "command": "solutionManager.openInEditor",
+          "group": "1_open@1"
+        },
+        {
+          "command": "solutionManager.openInExplorer",
+          "group": "1_open@2"
+        },
+        {
+          "command": "solutionManager.openInTerminal",
+          "group": "1_open@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "solutionManager.open"
+        },
+        {
+          "command": "solutionManager.openSolutionFile"
+        },
+        {
+          "command": "solutionManager.refresh"
+        },
+        {
+          "command": "solutionManager.scanWorkspace"
+        },
+        {
+          "command": "solutionManager.addProject"
+        },
+        {
+          "command": "solutionManager.build"
+        },
+        {
+          "command": "solutionManager.test"
+        },
+        {
+          "command": "solutionManager.openTreeItem",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.buildTreeItem",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.testTreeItem",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.addNewCSharpClass",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.addNewFile",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.addNewFolder",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.addProjectReference",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.manageNuGetPackages",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.unloadProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.reloadProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.efAddMigration",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.efRemoveMigration",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.efUpdateDatabase",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.efScriptMigration",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.buildSelectedProjects",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.runUnitTest",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.publishProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.restoreProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.cleanProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.rebuildProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.packProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.gitStatusProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.gitDiffProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.gitLogProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.copyFullPath",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.copyRelativePath",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.copyProjectReferenceXml",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.copyProjectName",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.openInEditor",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.openInExplorer",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.openInTerminal",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.showProperties",
+          "when": "false"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "validate": "node scripts/validate.js"
+  }
+}
