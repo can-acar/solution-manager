@@ -3,6 +3,16 @@ Version 1.0
 
 Required Notice: Copyright (c) 2026 Solution Manager contributors
 
+0. License Scope and Prior Releases
+
+This license applies to copies of the Software that are distributed with this
+license.
+
+If an earlier copy or release of the Software was distributed under the Apache
+License 2.0 or another license, that earlier copy remains governed by the
+license under which it was distributed. This license does not retroactively
+remove permissions that were already granted for earlier copies.
+
 1. Definitions
 
 "Software" means the Solution Manager extension, its source code, object code,
@@ -37,6 +47,9 @@ You may study, modify, adapt, and create derivative versions of the Software.
 You may use your modified versions of the Software for the permitted uses
 described in this license.
 
+You may distribute original or modified copies of the Software for free,
+provided that you follow the conditions below.
+
 You may distribute original or modified copies of the Software only if all of
 the following conditions are met:
 
@@ -57,6 +70,9 @@ Software, in original or modified form, as a paid product, paid extension, paid
 plugin, paid marketplace listing, paid subscription feature, paid hosted
 service, or paid bundle.
 
+Modifying, renaming, repackaging, or bundling the Software does not permit you
+to Sell the Software or any modified version of the Software.
+
 You may not use the Software's name, branding, or assets to market a competing
 paid product based on the Software.
 
@@ -75,6 +91,10 @@ client deliverables.
 You may sell, license, host, distribute, or otherwise commercialize Developed
 Applications, provided that you are not selling, licensing, hosting, bundling,
 or monetizing the Software itself.
+
+For clarity, a Developed Application is not considered the Software merely
+because it was created, edited, inspected, built, tested, or managed with the
+Software.
 
 6. Separate Commercial License
 

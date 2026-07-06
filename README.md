@@ -2,7 +2,9 @@
 
 Rider-inspired Solution Explorer for Visual Studio Code. Solution Manager opens `.sln` and `.slnx` workspaces as a native VS Code tree view with projects, folders, files, dependencies, project actions, and a rich project properties panel.
 
-This project is source-available. You may use Solution Manager to develop both commercial and non-commercial applications. You may modify Solution Manager itself, but you may not sell, monetize, or distribute Solution Manager as a paid product.
+This project is source-available. You may use Solution Manager to develop both commercial and non-commercial applications, and those applications may be sold or monetized. You may modify Solution Manager itself, but you may not sell, monetize, or distribute Solution Manager, including modified versions, as a paid product.
+
+Important license note: if an earlier release was already distributed under Apache License 2.0, that earlier copy remains under Apache License 2.0. The current license applies to copies distributed with the `LICENSE` file in this repository.
 
 > This extension is not affiliated with Microsoft Visual Studio, JetBrains Rider, or their owners. Product names are used only to describe compatible file formats and familiar workflows.
 
@@ -81,9 +83,27 @@ Licensed under the Solution Manager Source-Available License. See the `LICENSE` 
 
 In short, you may use Solution Manager as a development tool for commercial and non-commercial applications. Those applications are not restricted by this license merely because they were created with Solution Manager. You may also modify Solution Manager, but you may not sell, monetize, repackage, or distribute Solution Manager itself as a paid product, paid extension, paid subscription feature, paid hosted service, or paid bundle.
 
+If you previously published a release under Apache License 2.0, that already-published copy keeps the Apache License 2.0 permissions. Apache License 2.0 grants broad rights to reproduce, prepare derivative works, distribute, sublicense, and, under its patent grant, sell the work. The source-available license in this repository should be used for current and future copies where you want to keep application development allowed while preventing sale of Solution Manager itself.
+
+Allowed:
+
+- Use Solution Manager to develop commercial or non-commercial applications.
+- Sell, license, host, or otherwise commercialize applications created with Solution Manager.
+- Study, modify, and improve Solution Manager.
+- Share original or modified copies of Solution Manager for free, as long as the license terms are preserved.
+
+Not allowed:
+
+- Sell Solution Manager itself.
+- Sell modified versions of Solution Manager.
+- Offer Solution Manager as a paid extension, paid plugin, paid subscription feature, paid hosted service, or paid bundle.
+- Remove or hide the license and copyright notices.
+
 ## Türkçe
 
-Bu proje source-available olarak sunulur. Solution Manager kullanarak ticari veya ticari olmayan uygulamalar geliştirebilirsiniz. Solution Manager üzerinde geliştirme yapabilirsiniz, ancak Solution Manager'ın kendisini satamaz, paraya çeviremez veya ücretli ürün olarak dağıtamazsınız.
+Bu proje source-available olarak sunulur. Solution Manager kullanarak ticari veya ticari olmayan uygulamalar geliştirebilirsiniz ve bu uygulamaları satabilir ya da ticarileştirebilirsiniz. Solution Manager üzerinde geliştirme yapabilirsiniz, ancak Solution Manager'ın kendisini, değiştirilmiş sürümleri dahil, satamaz, paraya çeviremez veya ücretli ürün olarak dağıtamazsınız.
+
+Önemli lisans notu: daha önce Apache License 2.0 ile dağıtılmış bir sürüm varsa, o eski kopya Apache License 2.0 altında kalır. Bu repodaki `LICENSE` dosyasıyla dağıtılan mevcut kopyalar için yeni lisans geçerlidir.
 
 ### Özellikler
 
@@ -157,3 +177,19 @@ npx @vscode/vsce package --no-dependencies --skip-license
 Solution Manager Source-Available License ile lisanslanmıştır. Detaylar için repodaki `LICENSE` dosyasına bakın.
 
 Kısaca Solution Manager'ı ticari veya ticari olmayan uygulamalar geliştirmek için kullanabilirsiniz. Bu lisans, yalnızca Solution Manager ile geliştirildiği için uygulamalarınıza ek kısıtlama getirmez. Solution Manager üzerinde değişiklik yapabilirsiniz; ancak Solution Manager'ın kendisini satamaz, paraya çeviremez, yeniden paketleyip ücretli ürün/extension/abonelik özelliği/barındırılan servis/ücretli bundle olarak dağıtamazsınız.
+
+Daha önce Apache License 2.0 ile bir sürüm yayınladıysanız, o yayınlanmış kopya Apache License 2.0 izinlerini korur. Apache License 2.0; çoğaltma, türev çalışma hazırlama, dağıtma, alt lisanslama ve patent izni kapsamında satma gibi geniş haklar verir. Bu repodaki source-available lisansı, mevcut ve sonraki kopyalarda uygulama geliştirmeyi serbest bırakıp Solution Manager ürününün kendisinin satılmasını engellemek istediğiniz durum için kullanılmalıdır.
+
+İzin verilenler:
+
+- Solution Manager ile ticari veya ticari olmayan uygulamalar geliştirmek.
+- Solution Manager ile geliştirilen uygulamaları satmak, lisanslamak, barındırmak veya ticarileştirmek.
+- Solution Manager'ı incelemek, değiştirmek ve geliştirmek.
+- Lisans şartları korunduğu sürece Solution Manager'ın orijinal veya değiştirilmiş kopyalarını ücretsiz paylaşmak.
+
+İzin verilmeyenler:
+
+- Solution Manager'ın kendisini satmak.
+- Solution Manager'ın değiştirilmiş sürümlerini satmak.
+- Solution Manager'ı ücretli extension, ücretli plugin, abonelik özelliği, barındırılan servis veya ücretli bundle olarak sunmak.
+- Lisans ve telif bildirimlerini kaldırmak veya gizlemek.

@@ -28,6 +28,10 @@
     "onCommand:solutionManager.addNewFile",
     "onCommand:solutionManager.addNewFolder",
     "onCommand:solutionManager.addProjectReference",
+    "onCommand:solutionManager.addPackageReference",
+    "onCommand:solutionManager.addAssemblyReference",
+    "onCommand:solutionManager.addFrameworkReference",
+    "onCommand:solutionManager.addAnalyzerReference",
     "onCommand:solutionManager.manageNuGetPackages",
     "onCommand:solutionManager.unloadProject",
     "onCommand:solutionManager.reloadProject",
@@ -52,7 +56,30 @@
     "onCommand:solutionManager.openInEditor",
     "onCommand:solutionManager.openInExplorer",
     "onCommand:solutionManager.openInTerminal",
-    "onCommand:solutionManager.showProperties"
+    "onCommand:solutionManager.showProperties",
+    "onCommand:solutionManager.dependencyPackageDetails",
+    "onCommand:solutionManager.dependencyOpenNuGet",
+    "onCommand:solutionManager.dependencyOpenPackageFolder",
+    "onCommand:solutionManager.dependencyCopyPackageId",
+    "onCommand:solutionManager.dependencyCopyPackageFolder",
+    "onCommand:solutionManager.dependencyCopyPackageReference",
+    "onCommand:solutionManager.dependencyCopyPackageSourceMapping",
+    "onCommand:solutionManager.dependencyGroupDetails",
+    "onCommand:solutionManager.dependencyUpdatePackage",
+    "onCommand:solutionManager.dependencyRemovePackage",
+    "onCommand:solutionManager.dependencyListPackages",
+    "onCommand:solutionManager.dependencyReferenceDetails",
+    "onCommand:solutionManager.dependencyOpenReference",
+    "onCommand:solutionManager.dependencyOpenReferenceFolder",
+    "onCommand:solutionManager.dependencyCopyReferenceName",
+    "onCommand:solutionManager.dependencyCopyReferencePath",
+    "onCommand:solutionManager.dependencyCopyReferenceXml",
+    "onCommand:solutionManager.dependencyRemoveReference",
+    "onCommand:solutionManager.dependencyRemoveProjectReference",
+    "onCommand:solutionManager.dependencyFrameworkDetails",
+    "onCommand:solutionManager.dependencyBuildFramework",
+    "onCommand:solutionManager.dependencyTestFramework",
+    "onCommand:solutionManager.dependencyCopyFramework"
   ],
   "main": "./src/extension.js",
   "extensionKind": [
@@ -100,6 +127,14 @@
       {
         "id": "solutionManager.project.openIn",
         "label": "Open In"
+      },
+      {
+        "id": "solutionManager.dependency.copy",
+        "label": "Copy"
+      },
+      {
+        "id": "solutionManager.dependency.referenceCopy",
+        "label": "Copy"
       }
     ],
     "commands": [
@@ -186,6 +221,30 @@
         "title": "Add Project Reference...",
         "category": "Solution Manager",
         "icon": "$(references)"
+      },
+      {
+        "command": "solutionManager.addPackageReference",
+        "title": "Add PackageReference...",
+        "category": "Solution Manager",
+        "icon": "$(package)"
+      },
+      {
+        "command": "solutionManager.addAssemblyReference",
+        "title": "Add Assembly Reference...",
+        "category": "Solution Manager",
+        "icon": "$(library)"
+      },
+      {
+        "command": "solutionManager.addFrameworkReference",
+        "title": "Add Framework Reference...",
+        "category": "Solution Manager",
+        "icon": "$(symbol-namespace)"
+      },
+      {
+        "command": "solutionManager.addAnalyzerReference",
+        "title": "Add Analyzer...",
+        "category": "Solution Manager",
+        "icon": "$(beaker)"
       },
       {
         "command": "solutionManager.manageNuGetPackages",
@@ -336,6 +395,144 @@
         "title": "Properties...",
         "category": "Solution Manager",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "solutionManager.dependencyPackageDetails",
+        "title": "Package Details",
+        "category": "Solution Manager",
+        "icon": "$(info)"
+      },
+      {
+        "command": "solutionManager.dependencyOpenNuGet",
+        "title": "Open on NuGet.org",
+        "category": "Solution Manager",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "solutionManager.dependencyOpenPackageFolder",
+        "title": "Open Package Folder",
+        "category": "Solution Manager",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "solutionManager.dependencyCopyPackageId",
+        "title": "Copy Package ID",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.dependencyCopyPackageFolder",
+        "title": "Copy Package Folder",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.dependencyCopyPackageReference",
+        "title": "Copy PackageReference XML",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.dependencyCopyPackageSourceMapping",
+        "title": "Copy Package Source Mapping XML",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.dependencyGroupDetails",
+        "title": "Dependency Details",
+        "category": "Solution Manager",
+        "icon": "$(info)"
+      },
+      {
+        "command": "solutionManager.dependencyUpdatePackage",
+        "title": "Update Package",
+        "category": "Solution Manager",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "solutionManager.dependencyRemovePackage",
+        "title": "Remove Package",
+        "category": "Solution Manager",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "solutionManager.dependencyListPackages",
+        "title": "List Packages",
+        "category": "Solution Manager",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "solutionManager.dependencyReferenceDetails",
+        "title": "Reference Details",
+        "category": "Solution Manager",
+        "icon": "$(info)"
+      },
+      {
+        "command": "solutionManager.dependencyOpenReference",
+        "title": "Open Reference",
+        "category": "Solution Manager",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "solutionManager.dependencyOpenReferenceFolder",
+        "title": "Open Containing Folder",
+        "category": "Solution Manager",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "solutionManager.dependencyCopyReferenceName",
+        "title": "Copy Reference Name",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.dependencyCopyReferencePath",
+        "title": "Copy Reference Path",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.dependencyCopyReferenceXml",
+        "title": "Copy Reference XML",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.dependencyRemoveReference",
+        "title": "Remove Reference",
+        "category": "Solution Manager",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "solutionManager.dependencyRemoveProjectReference",
+        "title": "Remove Project Reference",
+        "category": "Solution Manager",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "solutionManager.dependencyFrameworkDetails",
+        "title": "Target Framework Details",
+        "category": "Solution Manager",
+        "icon": "$(info)"
+      },
+      {
+        "command": "solutionManager.dependencyBuildFramework",
+        "title": "Build Target Framework",
+        "category": "Solution Manager",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "solutionManager.dependencyTestFramework",
+        "title": "Test Target Framework",
+        "category": "Solution Manager",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "solutionManager.dependencyCopyFramework",
+        "title": "Copy Target Framework",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
       }
     ],
     "menus": {
@@ -421,6 +618,166 @@
           "command": "solutionManager.openTreeItem",
           "when": "view == solutionManager.solutionView && (viewItem == solution || viewItem == file)",
           "group": "inline@1"
+        },
+        {
+          "command": "solutionManager.dependencyGroupDetails",
+          "when": "view == solutionManager.solutionView && viewItem == dependencies",
+          "group": "7_dependency@0"
+        },
+        {
+          "command": "solutionManager.manageNuGetPackages",
+          "when": "view == solutionManager.solutionView && viewItem == dependencies",
+          "group": "7_dependency@1"
+        },
+        {
+          "command": "solutionManager.restoreProject",
+          "when": "view == solutionManager.solutionView && viewItem == dependencies",
+          "group": "7_dependency@2"
+        },
+        {
+          "command": "solutionManager.dependencyListPackages",
+          "when": "view == solutionManager.solutionView && viewItem == dependencies",
+          "group": "7_dependency@3"
+        },
+        {
+          "command": "solutionManager.showProperties",
+          "when": "view == solutionManager.solutionView && viewItem == dependencies",
+          "group": "7_dependency@4"
+        },
+        {
+          "command": "solutionManager.dependencyGroupDetails",
+          "when": "view == solutionManager.solutionView && viewItem == dependencyImports",
+          "group": "7_dependency@0"
+        },
+        {
+          "command": "solutionManager.dependencyFrameworkDetails",
+          "when": "view == solutionManager.solutionView && viewItem == dependencyFramework",
+          "group": "7_dependency@1"
+        },
+        {
+          "command": "solutionManager.dependencyBuildFramework",
+          "when": "view == solutionManager.solutionView && viewItem == dependencyFramework",
+          "group": "7_dependency@2"
+        },
+        {
+          "command": "solutionManager.dependencyTestFramework",
+          "when": "view == solutionManager.solutionView && viewItem == dependencyFramework",
+          "group": "7_dependency@3"
+        },
+        {
+          "command": "solutionManager.dependencyCopyFramework",
+          "when": "view == solutionManager.solutionView && viewItem == dependencyFramework",
+          "group": "7_dependency@4"
+        },
+        {
+          "command": "solutionManager.dependencyPackageDetails",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyPackage.direct || viewItem == dependencyPackage.transitive || viewItem == dependencyItem.packages || viewItem == dependencyItem.packageDependency)",
+          "group": "7_dependency@1"
+        },
+        {
+          "command": "solutionManager.dependencyOpenNuGet",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyPackage.direct || viewItem == dependencyPackage.transitive || viewItem == dependencyItem.packages || viewItem == dependencyItem.packageDependency)",
+          "group": "7_dependency@2"
+        },
+        {
+          "command": "solutionManager.dependencyOpenPackageFolder",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyPackage.direct || viewItem == dependencyPackage.transitive || viewItem == dependencyItem.packages || viewItem == dependencyItem.packageDependency)",
+          "group": "7_dependency@3"
+        },
+        {
+          "submenu": "solutionManager.dependency.copy",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyPackage.direct || viewItem == dependencyPackage.transitive || viewItem == dependencyItem.packages || viewItem == dependencyItem.packageDependency)",
+          "group": "7_dependency@4"
+        },
+        {
+          "command": "solutionManager.dependencyUpdatePackage",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyPackage.direct || viewItem == dependencyItem.packages)",
+          "group": "7_dependency@5"
+        },
+        {
+          "command": "solutionManager.dependencyRemovePackage",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyPackage.direct || viewItem == dependencyItem.packages)",
+          "group": "7_dependency@6"
+        },
+        {
+          "command": "solutionManager.dependencyListPackages",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyPackage.direct || viewItem == dependencyPackage.transitive || viewItem == dependencyItem.packages || viewItem == dependencyItem.packageDependency)",
+          "group": "7_dependency@7"
+        },
+        {
+          "command": "solutionManager.dependencyReferenceDetails",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyItem.import || viewItem == dependencyItem.assemblies || viewItem == dependencyItem.projects || viewItem == dependencyItem.analyzers || viewItem == dependencyItem.frameworks || viewItem == dependencyItem.sourceGenerators || viewItem == dependencyItem.compileAssets || viewItem == dependencyItem.runtimeAssets)",
+          "group": "7_dependency@8"
+        },
+        {
+          "command": "solutionManager.dependencyOpenReference",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyItem.import || viewItem == dependencyItem.assemblies || viewItem == dependencyItem.projects || viewItem == dependencyItem.analyzers || viewItem == dependencyItem.sourceGenerators || viewItem == dependencyItem.compileAssets || viewItem == dependencyItem.runtimeAssets)",
+          "group": "7_dependency@9"
+        },
+        {
+          "command": "solutionManager.dependencyOpenReferenceFolder",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyItem.import || viewItem == dependencyItem.assemblies || viewItem == dependencyItem.projects || viewItem == dependencyItem.analyzers || viewItem == dependencyItem.sourceGenerators || viewItem == dependencyItem.compileAssets || viewItem == dependencyItem.runtimeAssets)",
+          "group": "7_dependency@10"
+        },
+        {
+          "submenu": "solutionManager.dependency.referenceCopy",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyItem.import || viewItem == dependencyItem.assemblies || viewItem == dependencyItem.projects || viewItem == dependencyItem.analyzers || viewItem == dependencyItem.frameworks || viewItem == dependencyItem.sourceGenerators || viewItem == dependencyItem.compileAssets || viewItem == dependencyItem.runtimeAssets)",
+          "group": "7_dependency@11"
+        },
+        {
+          "command": "solutionManager.dependencyRemoveReference",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyItem.assemblies || viewItem == dependencyItem.frameworks || viewItem == dependencyItem.analyzers)",
+          "group": "7_dependency@12"
+        },
+        {
+          "command": "solutionManager.dependencyRemoveProjectReference",
+          "when": "view == solutionManager.solutionView && viewItem == dependencyItem.projects",
+          "group": "7_dependency@13"
+        },
+        {
+          "command": "solutionManager.dependencyGroupDetails",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyGroup.assemblies || viewItem == dependencyGroup.projects || viewItem == dependencyGroup.analyzers || viewItem == dependencyGroup.packages || viewItem == dependencyGroup.transitivePackages || viewItem == dependencyGroup.frameworks || viewItem == dependencyGroup.sourceGenerators || viewItem == dependencyGroup.packageDependency || viewItem == dependencyGroup.compileAssets || viewItem == dependencyGroup.runtimeAssets)",
+          "group": "7_dependency@0"
+        },
+        {
+          "command": "solutionManager.addAssemblyReference",
+          "when": "view == solutionManager.solutionView && viewItem == dependencyGroup.assemblies",
+          "group": "7_dependency@1"
+        },
+        {
+          "command": "solutionManager.addFrameworkReference",
+          "when": "view == solutionManager.solutionView && viewItem == dependencyGroup.frameworks",
+          "group": "7_dependency@1"
+        },
+        {
+          "command": "solutionManager.addAnalyzerReference",
+          "when": "view == solutionManager.solutionView && viewItem == dependencyGroup.analyzers",
+          "group": "7_dependency@1"
+        },
+        {
+          "command": "solutionManager.addProjectReference",
+          "when": "view == solutionManager.solutionView && viewItem == dependencyGroup.projects",
+          "group": "7_dependency@1"
+        },
+        {
+          "command": "solutionManager.addPackageReference",
+          "when": "view == solutionManager.solutionView && viewItem == dependencyGroup.packages",
+          "group": "7_dependency@1"
+        },
+        {
+          "command": "solutionManager.manageNuGetPackages",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyGroup.packages || viewItem == dependencyGroup.transitivePackages)",
+          "group": "7_dependency@2"
+        },
+        {
+          "command": "solutionManager.restoreProject",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyGroup.packages || viewItem == dependencyGroup.transitivePackages)",
+          "group": "7_dependency@3"
+        },
+        {
+          "command": "solutionManager.dependencyListPackages",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyGroup.packages || viewItem == dependencyGroup.transitivePackages)",
+          "group": "7_dependency@4"
         }
       ],
       "solutionManager.project.add": [
@@ -439,6 +796,18 @@
         {
           "command": "solutionManager.addProjectReference",
           "group": "2_reference@1"
+        },
+        {
+          "command": "solutionManager.addAssemblyReference",
+          "group": "2_reference@2"
+        },
+        {
+          "command": "solutionManager.addFrameworkReference",
+          "group": "2_reference@3"
+        },
+        {
+          "command": "solutionManager.addAnalyzerReference",
+          "group": "2_reference@4"
         }
       ],
       "solutionManager.project.ef": [
@@ -523,6 +892,39 @@
           "group": "1_open@3"
         }
       ],
+      "solutionManager.dependency.copy": [
+        {
+          "command": "solutionManager.dependencyCopyPackageId",
+          "group": "1_copy@1"
+        },
+        {
+          "command": "solutionManager.dependencyCopyPackageFolder",
+          "group": "1_copy@2"
+        },
+        {
+          "command": "solutionManager.dependencyCopyPackageReference",
+          "group": "1_copy@3"
+        },
+        {
+          "command": "solutionManager.dependencyCopyPackageSourceMapping",
+          "group": "1_copy@4"
+        }
+      ],
+      "solutionManager.dependency.referenceCopy": [
+        {
+          "command": "solutionManager.dependencyCopyReferenceName",
+          "group": "1_copy@1"
+        },
+        {
+          "command": "solutionManager.dependencyCopyReferenceXml",
+          "group": "1_copy@2"
+        },
+        {
+          "command": "solutionManager.dependencyCopyReferencePath",
+          "when": "view == solutionManager.solutionView && (viewItem == dependencyItem.import || viewItem == dependencyItem.assemblies || viewItem == dependencyItem.projects || viewItem == dependencyItem.analyzers || viewItem == dependencyItem.sourceGenerators || viewItem == dependencyItem.compileAssets || viewItem == dependencyItem.runtimeAssets)",
+          "group": "1_copy@3"
+        }
+      ],
       "commandPalette": [
         {
           "command": "solutionManager.open"
@@ -571,6 +973,22 @@
         },
         {
           "command": "solutionManager.addProjectReference",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.addPackageReference",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.addAssemblyReference",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.addFrameworkReference",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.addAnalyzerReference",
           "when": "false"
         },
         {
@@ -671,6 +1089,98 @@
         },
         {
           "command": "solutionManager.showProperties",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyPackageDetails",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyOpenNuGet",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyOpenPackageFolder",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyCopyPackageId",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyCopyPackageFolder",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyCopyPackageReference",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyCopyPackageSourceMapping",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyGroupDetails",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyUpdatePackage",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyRemovePackage",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyListPackages",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyReferenceDetails",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyOpenReference",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyOpenReferenceFolder",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyCopyReferenceName",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyCopyReferencePath",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyCopyReferenceXml",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyRemoveReference",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyRemoveProjectReference",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyFrameworkDetails",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyBuildFramework",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyTestFramework",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.dependencyCopyFramework",
           "when": "false"
         }
       ]
