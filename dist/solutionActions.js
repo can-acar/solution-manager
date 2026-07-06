@@ -40,6 +40,8 @@ const vscode = __importStar(require("vscode"));
 const terminalRunner_1 = require("#src/terminalRunner");
 const solutionFileEditor_1 = require("#src/solutionFileEditor");
 const searchActions_1 = require("#src/searchActions");
+const solutionConfigurationEditor_1 = require("#src/solutionConfigurationEditor");
+const solutionPropertiesView_1 = require("#src/solutionPropertiesView");
 const PROJECT_FILE_EXTENSIONS = new Set(['.csproj', '.fsproj', '.vbproj', '.proj']);
 const PROJECT_TEMPLATES = [
     {
@@ -430,16 +432,24 @@ class SolutionActions {
         vscode.window.setStatusBarMessage('Solution Manager: copied to clipboard.', 2000);
     }
     async showProperties(solution) {
-        const projects = getSolutionProjects(solution);
-        const folders = getSolutionFolders(solution);
-        const unloaded = this.getUnloadedProjectUris();
-        const content = createSolutionPropertiesMarkdown(solution, projects, folders, unloaded);
-        const document = await vscode.workspace.openTextDocument({
-            content,
-            language: 'markdown'
-        });
-        await vscode.window.showTextDocument(document, {
-            preview: false
+        if (!solution?.path) {
+            vscode.window.showInformationMessage('Solution Manager: no solution file is available.');
+            return;
+        }
+        const attachDependencyCounts = (model) => {
+            const byPath = new Map(getSolutionProjects(solution).map((project) => [
+                normalizePath(project.path),
+                (project.metadata?.projectReferences || []).length
+            ]));
+            for (const project of model.projects) {
+                project.dependencyCount = byPath.get(normalizePath(project.absolutePath)) ?? 0;
+            }
+            return model;
+        };
+        const model = attachDependencyCounts(await (0, solutionConfigurationEditor_1.readSolutionConfigurationModel)(solution.path));
+        (0, solutionPropertiesView_1.showSolutionProperties)(this.context, solution, model, async (change) => {
+            await (0, solutionConfigurationEditor_1.applySolutionConfigurationChange)(solution.path, change);
+            return attachDependencyCounts(await (0, solutionConfigurationEditor_1.readSolutionConfigurationModel)(solution.path));
         });
     }
     async pickProject(solution, options = {}) {

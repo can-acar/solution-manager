@@ -40,6 +40,7 @@ const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 const projectActions_1 = require("#src/projectActions");
 const solutionActions_1 = require("#src/solutionActions");
+const fileExplorerActions_1 = require("#src/fileExplorerActions");
 const projectAssetsReader_1 = require("#src/projectAssetsReader");
 const projectFileEditor_1 = require("#src/projectFileEditor");
 const terminalRunner_1 = require("#src/terminalRunner");
@@ -74,6 +75,7 @@ class SolutionTreeProvider {
             getUnloadedProjectUris: () => this.getUnloadedProjectUris(),
             setUnloadedProjectUris: (uris) => this.setUnloadedProjectUris(uris)
         });
+        this.fileExplorerActions = new fileExplorerActions_1.FileExplorerActions(() => this.refresh({ userVisible: false }));
         this.onDidChangeTreeDataEmitter = new vscode.EventEmitter();
         this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
         this.currentState = undefined;
@@ -81,6 +83,49 @@ class SolutionTreeProvider {
     }
     setTreeView(treeView) {
         this.treeView = treeView;
+    }
+    getDragAndDropController() {
+        return this.fileExplorerActions.createDragAndDropController();
+    }
+    async runFileAction(action, node, nodes = undefined) {
+        const selection = Array.isArray(nodes) && nodes.length > 0 ? nodes : [node];
+        try {
+            switch (action) {
+                case 'rename':
+                    await this.fileExplorerActions.rename(node);
+                    break;
+                case 'delete':
+                    await this.fileExplorerActions.delete(selection);
+                    break;
+                case 'cut':
+                    this.fileExplorerActions.cut(selection);
+                    break;
+                case 'copy':
+                    this.fileExplorerActions.copy(selection);
+                    break;
+                case 'paste':
+                    await this.fileExplorerActions.paste(node);
+                    break;
+                case 'revealInOS':
+                    await this.fileExplorerActions.revealInOS(node);
+                    break;
+                case 'openToSide':
+                    await this.fileExplorerActions.openToSide(node);
+                    break;
+                case 'copyPath':
+                    await this.fileExplorerActions.copyPath(node);
+                    break;
+                case 'copyRelativePath':
+                    await this.fileExplorerActions.copyRelativePath(node);
+                    break;
+                default:
+                    break;
+            }
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Solution Manager: ${message}`);
+        }
     }
     async focus() {
         await vscode.commands.executeCommand('workbench.view.extension.solutionManager');

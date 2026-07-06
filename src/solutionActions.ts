@@ -8,6 +8,11 @@ import {
   saveSolutionAs
 } from '#src/solutionFileEditor';
 import { openScopedFindInFiles, openScopedQuickOpen } from '#src/searchActions';
+import {
+  applySolutionConfigurationChange,
+  readSolutionConfigurationModel
+} from '#src/solutionConfigurationEditor';
+import { showSolutionProperties } from '#src/solutionPropertiesView';
 
 const PROJECT_FILE_EXTENSIONS = new Set(['.csproj', '.fsproj', '.vbproj', '.proj']);
 const PROJECT_TEMPLATES = [
@@ -463,17 +468,28 @@ class SolutionActions {
   }
 
   async showProperties(solution) {
-    const projects = getSolutionProjects(solution);
-    const folders = getSolutionFolders(solution);
-    const unloaded = this.getUnloadedProjectUris();
-    const content = createSolutionPropertiesMarkdown(solution, projects, folders, unloaded);
-    const document = await vscode.workspace.openTextDocument({
-      content,
-      language: 'markdown'
-    });
+    if (!solution?.path) {
+      vscode.window.showInformationMessage('Solution Manager: no solution file is available.');
+      return;
+    }
 
-    await vscode.window.showTextDocument(document, {
-      preview: false
+    const attachDependencyCounts = (model) => {
+      const byPath = new Map(getSolutionProjects(solution).map((project) => [
+        normalizePath(project.path),
+        (project.metadata?.projectReferences || []).length
+      ]));
+
+      for (const project of model.projects) {
+        project.dependencyCount = byPath.get(normalizePath(project.absolutePath)) ?? 0;
+      }
+
+      return model;
+    };
+
+    const model = attachDependencyCounts(await readSolutionConfigurationModel(solution.path));
+    showSolutionProperties(this.context, solution, model, async (change) => {
+      await applySolutionConfigurationChange(solution.path, change);
+      return attachDependencyCounts(await readSolutionConfigurationModel(solution.path));
     });
   }
 

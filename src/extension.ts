@@ -10,7 +10,8 @@ function activate(context) {
   const treeView = vscode.window.createTreeView(SolutionTreeProvider.viewType, {
     treeDataProvider: provider,
     canSelectMany: true,
-    showCollapseAll: true
+    showCollapseAll: true,
+    dragAndDropController: provider.getDragAndDropController()
   });
   provider.setTreeView(treeView);
 
@@ -122,7 +123,16 @@ function activate(context) {
     vscode.commands.registerCommand('solutionManager.solutionProperties', (node) => provider.runSolutionAction('showProperties', node)),
     vscode.commands.registerCommand('solutionManager.solutionFindInFiles', (node) => provider.runSolutionAction('findInFiles', node)),
     vscode.commands.registerCommand('solutionManager.solutionReplaceInFiles', (node) => provider.runSolutionAction('replaceInFiles', node)),
-    vscode.commands.registerCommand('solutionManager.solutionFindFile', (node) => provider.runSolutionAction('findFile', node))
+    vscode.commands.registerCommand('solutionManager.solutionFindFile', (node) => provider.runSolutionAction('findFile', node)),
+    vscode.commands.registerCommand('solutionManager.fileRename', (node) => provider.runFileAction('rename', node)),
+    vscode.commands.registerCommand('solutionManager.fileDelete', (node, nodes) => provider.runFileAction('delete', node, nodes)),
+    vscode.commands.registerCommand('solutionManager.fileCut', (node, nodes) => provider.runFileAction('cut', node, nodes)),
+    vscode.commands.registerCommand('solutionManager.fileCopy', (node, nodes) => provider.runFileAction('copy', node, nodes)),
+    vscode.commands.registerCommand('solutionManager.filePaste', (node) => provider.runFileAction('paste', node)),
+    vscode.commands.registerCommand('solutionManager.fileRevealInOS', (node) => provider.runFileAction('revealInOS', node)),
+    vscode.commands.registerCommand('solutionManager.fileOpenToSide', (node) => provider.runFileAction('openToSide', node)),
+    vscode.commands.registerCommand('solutionManager.fileCopyPath', (node) => provider.runFileAction('copyPath', node)),
+    vscode.commands.registerCommand('solutionManager.fileCopyRelativePath', (node) => provider.runFileAction('copyRelativePath', node))
   );
 }
 

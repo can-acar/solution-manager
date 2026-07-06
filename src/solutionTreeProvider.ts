@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { ProjectActions } from '#src/projectActions';
 import { SolutionActions } from '#src/solutionActions';
+import { FileExplorerActions } from '#src/fileExplorerActions';
 import { PACKAGE_ASSET_GROUPS } from '#src/projectAssetsReader';
 import { updateProjectItemReferences } from '#src/projectFileEditor';
 import { TerminalRunner, quoteForShell } from '#src/terminalRunner';
@@ -49,6 +50,7 @@ class SolutionTreeProvider {
       getUnloadedProjectUris: () => this.getUnloadedProjectUris(),
       setUnloadedProjectUris: (uris) => this.setUnloadedProjectUris(uris)
     });
+    this.fileExplorerActions = new FileExplorerActions(() => this.refresh({ userVisible: false }));
     this.onDidChangeTreeDataEmitter = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
     this.currentState = undefined;
@@ -57,6 +59,51 @@ class SolutionTreeProvider {
 
   setTreeView(treeView) {
     this.treeView = treeView;
+  }
+
+  getDragAndDropController() {
+    return this.fileExplorerActions.createDragAndDropController();
+  }
+
+  async runFileAction(action, node, nodes = undefined) {
+    const selection = Array.isArray(nodes) && nodes.length > 0 ? nodes : [node];
+
+    try {
+      switch (action) {
+        case 'rename':
+          await this.fileExplorerActions.rename(node);
+          break;
+        case 'delete':
+          await this.fileExplorerActions.delete(selection);
+          break;
+        case 'cut':
+          this.fileExplorerActions.cut(selection);
+          break;
+        case 'copy':
+          this.fileExplorerActions.copy(selection);
+          break;
+        case 'paste':
+          await this.fileExplorerActions.paste(node);
+          break;
+        case 'revealInOS':
+          await this.fileExplorerActions.revealInOS(node);
+          break;
+        case 'openToSide':
+          await this.fileExplorerActions.openToSide(node);
+          break;
+        case 'copyPath':
+          await this.fileExplorerActions.copyPath(node);
+          break;
+        case 'copyRelativePath':
+          await this.fileExplorerActions.copyRelativePath(node);
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`Solution Manager: ${message}`);
+    }
   }
 
   async focus() {

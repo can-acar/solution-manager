@@ -121,7 +121,16 @@
     "onCommand:solutionManager.solutionFindFile",
     "onCommand:solutionManager.projectFindInFiles",
     "onCommand:solutionManager.projectReplaceInFiles",
-    "onCommand:solutionManager.projectFindFile"
+    "onCommand:solutionManager.projectFindFile",
+    "onCommand:solutionManager.fileRename",
+    "onCommand:solutionManager.fileDelete",
+    "onCommand:solutionManager.fileCut",
+    "onCommand:solutionManager.fileCopy",
+    "onCommand:solutionManager.filePaste",
+    "onCommand:solutionManager.fileRevealInOS",
+    "onCommand:solutionManager.fileOpenToSide",
+    "onCommand:solutionManager.fileCopyPath",
+    "onCommand:solutionManager.fileCopyRelativePath"
   ],
   "main": "./dist/extension.js",
   "imports": {
@@ -896,6 +905,51 @@
         "title": "Find File in Project...",
         "category": "Solution Manager",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "solutionManager.fileRename",
+        "title": "Rename...",
+        "category": "Solution Manager"
+      },
+      {
+        "command": "solutionManager.fileDelete",
+        "title": "Delete",
+        "category": "Solution Manager"
+      },
+      {
+        "command": "solutionManager.fileCut",
+        "title": "Cut",
+        "category": "Solution Manager"
+      },
+      {
+        "command": "solutionManager.fileCopy",
+        "title": "Copy",
+        "category": "Solution Manager"
+      },
+      {
+        "command": "solutionManager.filePaste",
+        "title": "Paste",
+        "category": "Solution Manager"
+      },
+      {
+        "command": "solutionManager.fileRevealInOS",
+        "title": "Reveal in File Explorer",
+        "category": "Solution Manager"
+      },
+      {
+        "command": "solutionManager.fileOpenToSide",
+        "title": "Open to the Side",
+        "category": "Solution Manager"
+      },
+      {
+        "command": "solutionManager.fileCopyPath",
+        "title": "Copy Path",
+        "category": "Solution Manager"
+      },
+      {
+        "command": "solutionManager.fileCopyRelativePath",
+        "title": "Copy Relative Path",
+        "category": "Solution Manager"
       }
     ],
     "menus": {
@@ -1241,6 +1295,51 @@
           "command": "solutionManager.dependencyListPackages",
           "when": "view == solutionManager.solutionView && (viewItem == dependencyGroup.packages || viewItem == dependencyGroup.transitivePackages)",
           "group": "7_dependency@4"
+        },
+        {
+          "command": "solutionManager.fileOpenToSide",
+          "when": "view == solutionManager.solutionView && viewItem == file",
+          "group": "1_fileopen@1"
+        },
+        {
+          "command": "solutionManager.fileRevealInOS",
+          "when": "view == solutionManager.solutionView && (viewItem == file || viewItem == directory)",
+          "group": "1_fileopen@2"
+        },
+        {
+          "command": "solutionManager.fileCut",
+          "when": "view == solutionManager.solutionView && (viewItem == file || viewItem == directory)",
+          "group": "7_fileedit@1"
+        },
+        {
+          "command": "solutionManager.fileCopy",
+          "when": "view == solutionManager.solutionView && (viewItem == file || viewItem == directory)",
+          "group": "7_fileedit@2"
+        },
+        {
+          "command": "solutionManager.filePaste",
+          "when": "view == solutionManager.solutionView && (viewItem == file || viewItem == directory || viewItem == projectLoaded || viewItem == projectTestLoaded) && solutionManager.hasClipboard",
+          "group": "7_fileedit@3"
+        },
+        {
+          "command": "solutionManager.fileRename",
+          "when": "view == solutionManager.solutionView && (viewItem == file || viewItem == directory)",
+          "group": "8_filemodify@1"
+        },
+        {
+          "command": "solutionManager.fileDelete",
+          "when": "view == solutionManager.solutionView && (viewItem == file || viewItem == directory)",
+          "group": "8_filemodify@2"
+        },
+        {
+          "command": "solutionManager.fileCopyPath",
+          "when": "view == solutionManager.solutionView && (viewItem == file || viewItem == directory)",
+          "group": "9_filecopypath@1"
+        },
+        {
+          "command": "solutionManager.fileCopyRelativePath",
+          "when": "view == solutionManager.solutionView && (viewItem == file || viewItem == directory)",
+          "group": "9_filecopypath@2"
         }
       ],
       "solutionManager.solution.add": [
@@ -1583,6 +1682,42 @@
         },
         {
           "command": "solutionManager.projectFindFile",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.fileRename",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.fileDelete",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.fileCut",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.fileCopy",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.filePaste",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.fileRevealInOS",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.fileOpenToSide",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.fileCopyPath",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.fileCopyRelativePath",
           "when": "false"
         },
         {
