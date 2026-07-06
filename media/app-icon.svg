@@ -1,0 +1,43 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="app-bg" x1="28" y1="18" x2="230" y2="238" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="0.45" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="file-grad" x1="70" y1="48" x2="174" y2="188" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFC"/>
+      <stop offset="1" stop-color="#BFDBFE"/>
+    </linearGradient>
+    <linearGradient id="package-grad" x1="139" y1="132" x2="216" y2="211" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FACC15"/>
+      <stop offset="0.52" stop-color="#22C55E"/>
+      <stop offset="1" stop-color="#14B8A6"/>
+    </linearGradient>
+    <filter id="shadow" x="14" y="14" width="228" height="230" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="14" stdDeviation="15" flood-color="#020617" flood-opacity="0.34"/>
+    </filter>
+    <filter id="soft-shadow" x="56" y="34" width="166" height="190" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="7" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <rect x="22" y="22" width="212" height="212" rx="48" fill="url(#app-bg)" filter="url(#shadow)"/>
+  <path d="M50 70C50 59.5066 58.5066 51 69 51H130L165 86V186C165 196.493 156.493 205 146 205H69C58.5066 205 50 196.493 50 186V70Z" fill="#0F172A" fill-opacity="0.28"/>
+
+  <g filter="url(#soft-shadow)">
+    <path d="M64 55C64 48.9249 68.9249 44 75 44H137L176 83V181C176 187.075 171.075 192 165 192H75C68.9249 192 64 187.075 64 181V55Z" fill="url(#file-grad)"/>
+    <path d="M137 44V74C137 80.0751 141.925 85 148 85H176" fill="#DBEAFE"/>
+    <path d="M137 44V74C137 80.0751 141.925 85 148 85H176" stroke="#60A5FA" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <path d="M88 101H122M88 124H145M88 147H132" stroke="#1D4ED8" stroke-width="9" stroke-linecap="round"/>
+  <path d="M87 101H74M87 124H74M87 147H74" stroke="#38BDF8" stroke-width="9" stroke-linecap="round"/>
+  <path d="M75 101V147" stroke="#38BDF8" stroke-width="6" stroke-linecap="round"/>
+
+  <path d="M156 128L209 157.5V216.5L156 246L103 216.5V157.5L156 128Z" fill="url(#package-grad)" stroke="#F8FAFC" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M106 158L156 187M156 187L206 158M156 187V241" stroke="#064E3B" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M130 143L183 173" stroke="#ECFCCB" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="196" cy="69" r="17" fill="#FACC15" stroke="#F8FAFC" stroke-width="6"/>
+  <path d="M187 69H205M196 60V78" stroke="#713F12" stroke-width="5" stroke-linecap="round"/>
+</svg>

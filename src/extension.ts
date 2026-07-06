@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { SolutionTreeProvider } from '#src/solutionTreeProvider';
 
 function activate(context) {
+  registerDevelopmentAutoReload(context);
   updateAspireTemplateContext();
 
   const provider = new SolutionTreeProvider(context);
@@ -120,6 +121,52 @@ function activate(context) {
 }
 
 function deactivate() {}
+
+function registerDevelopmentAutoReload(context) {
+  if (context.extensionMode !== vscode.ExtensionMode.Development) {
+    return;
+  }
+
+  const activatedAt = Date.now();
+  let reloadTimer;
+  const patterns = [
+    'dist/**/*.js',
+    'dist/**/*.json',
+    'dist/protocol-host/**/*',
+    'media/**/*',
+    'package.json'
+  ];
+
+  const scheduleReload = () => {
+    if (Date.now() - activatedAt < 1500) {
+      return;
+    }
+
+    if (reloadTimer) {
+      clearTimeout(reloadTimer);
+    }
+
+    reloadTimer = setTimeout(() => {
+      vscode.commands.executeCommand('workbench.action.reloadWindow');
+    }, 600);
+  };
+
+  for (const pattern of patterns) {
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(context.extensionPath, pattern));
+    watcher.onDidCreate(scheduleReload, undefined, context.subscriptions);
+    watcher.onDidChange(scheduleReload, undefined, context.subscriptions);
+    watcher.onDidDelete(scheduleReload, undefined, context.subscriptions);
+    context.subscriptions.push(watcher);
+  }
+
+  context.subscriptions.push({
+    dispose: () => {
+      if (reloadTimer) {
+        clearTimeout(reloadTimer);
+      }
+    }
+  });
+}
 
 function updateAspireTemplateContext() {
   vscode.commands.executeCommand('setContext', 'solutionManager.hasAspireTemplate', false);

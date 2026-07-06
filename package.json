@@ -2,10 +2,11 @@
   "name": "solution-manager",
   "displayName": "Solution Manager",
   "description": "Rider-style Solution view for .sln and .slnx files, projects, folders, and files.",
-  "version": "0.1.0",
+  "version": "1.0.3",
   "publisher": "local",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
+  "icon": "media/app-icon.png",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -1829,6 +1830,9 @@
     "compile": "npm run compile:ts && npm run compile:protocol-host",
     "compile:ts": "tsc -p tsconfig.json",
     "compile:protocol-host": "dotnet publish src/protocol-host/CanNugetGallery.ProtocolHost.csproj -c Release -o dist/protocol-host --nologo",
+    "dev:watch": "npm run compile:protocol-host && npm run watch:ts",
+    "watch:ts": "tsc -watch -p tsconfig.json --preserveWatchOutput",
+    "watch:protocol-host": "dotnet watch --project src/protocol-host/CanNugetGallery.ProtocolHost.csproj publish -c Release -o dist/protocol-host --nologo",
     "validate": "node scripts/validate.js"
   },
   "devDependencies": {

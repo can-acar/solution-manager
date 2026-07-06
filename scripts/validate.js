@@ -407,6 +407,15 @@ function validateNuGetManagerView() {
 
   try {
     const { __test } = require(runtimeModulePath('nugetManagerView.js'));
+    const nugetManagerSource = fs.readFileSync(path.join(process.cwd(), 'src/nugetManagerView.ts'), 'utf8');
+    assert(nugetManagerSource.includes('>All Solution</option>'), 'NuGet Manager project selector does not expose All Solution.');
+    assert(!nugetManagerSource.includes('state.selectedProjectPath = state.projects[0].path'), 'NuGet Manager should not default to the first project.');
+    assert(nugetManagerSource.includes('Paketler'), 'NuGet Manager does not expose the packages tab.');
+    assert(nugetManagerSource.includes('Kaynaklar'), 'NuGet Manager does not expose the sources tab.');
+    assert(nugetManagerSource.includes('activePackageTab'), 'NuGet Manager does not expose package browse/installed tab state.');
+    assert(nugetManagerSource.includes('renderInstalledPackageDetails'), 'NuGet Manager does not render installed package project details.');
+    assert(nugetManagerSource.includes('installedProjects'), 'NuGet Manager installed package grouping does not keep project ownership.');
+
     const packageInfo = __test.mapProtocolPackage({
       Id: 'Newtonsoft.Json',
       Name: 'Newtonsoft.Json',

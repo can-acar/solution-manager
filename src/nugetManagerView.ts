@@ -190,40 +190,75 @@ class NuGetManagerView {
       }
 
       if (message.type === 'install' || message.type === 'update') {
-        const project = this.requireProject(message.projectPath);
         const packageId = requireText(message.packageId, 'Package id is required.');
         const version = String(message.version || '').trim();
-        const updatedInProjectFiles = await this.tryApplyProjectFilePackageUpdate(project, packageId, version);
+        const projects = this.getActionProjects(message.projectPath, packageId, message.type);
+        let updatedInProjectFiles = 0;
+        let commandCount = 0;
 
-        if (updatedInProjectFiles) {
+        if (projects.length === 0) {
+          throw new Error('No projects were found for this package action.');
+        }
+
+        for (const project of projects) {
+          const didUpdateProjectFiles = await this.tryApplyProjectFilePackageUpdate(project, packageId, version);
+
+          if (didUpdateProjectFiles) {
+            updatedInProjectFiles += 1;
+            continue;
+          }
+
+          const versionArg = version ? ` --version ${quoteForShell(version)}` : '';
+          const sourceArg = message.sourceUrl ? ` --source ${quoteForShell(normalizeSourceForDotnet(message.sourceUrl))}` : '';
+          const restoreArg = getSkipRestore() ? ' --no-restore' : '';
+          this.terminalRunner.runCommand(`dotnet add ${quoteForShell(project.path)} package ${quoteForShell(packageId)}${versionArg}${sourceArg}${restoreArg}`);
+          commandCount += 1;
+        }
+
+        if (updatedInProjectFiles > 0) {
           await this.refresh({ userVisible: false });
           const state = await this.getState();
           this.projects = mergeFreshProjectMetadata(this.projects, state);
           await this.postState(message.requestId);
-          await this.postNotice(message.requestId, `${message.type === 'update' ? 'Updated' : 'Installed'} ${packageId} in project files.`);
-          return;
         }
 
-        const versionArg = version ? ` --version ${quoteForShell(version)}` : '';
-        const sourceArg = message.sourceUrl ? ` --source ${quoteForShell(normalizeSourceForDotnet(message.sourceUrl))}` : '';
-        const restoreArg = getSkipRestore() ? ' --no-restore' : '';
-        this.terminalRunner.runCommand(`dotnet add ${quoteForShell(project.path)} package ${quoteForShell(packageId)}${versionArg}${sourceArg}${restoreArg}`);
-        await this.postNotice(message.requestId, `${message.type === 'update' ? 'Update' : 'Install'} command sent to terminal.`);
+        const fileMessage = updatedInProjectFiles > 0 ? `${updatedInProjectFiles} project file update${updatedInProjectFiles === 1 ? '' : 's'}` : '';
+        const terminalMessage = commandCount > 0 ? `${commandCount} terminal command${commandCount === 1 ? '' : 's'}` : '';
+        await this.postNotice(
+          message.requestId,
+          `${message.type === 'update' ? 'Update' : 'Install'} applied to ${projects.length} project${projects.length === 1 ? '' : 's'}${fileMessage || terminalMessage ? ` (${[fileMessage, terminalMessage].filter(Boolean).join(', ')})` : ''}.`
+        );
         return;
       }
 
       if (message.type === 'remove') {
-        const project = this.requireProject(message.projectPath);
         const packageId = requireText(message.packageId, 'Package id is required.');
-        this.terminalRunner.runCommand(`dotnet remove ${quoteForShell(project.path)} package ${quoteForShell(packageId)}`);
-        await this.postNotice(message.requestId, 'Remove command sent to terminal.');
+        const projects = this.getActionProjects(message.projectPath, packageId, message.type);
+
+        if (projects.length === 0) {
+          throw new Error(`Package '${packageId}' is not installed in the selected scope.`);
+        }
+
+        for (const project of projects) {
+          this.terminalRunner.runCommand(`dotnet remove ${quoteForShell(project.path)} package ${quoteForShell(packageId)}`);
+        }
+
+        await this.postNotice(message.requestId, `Remove command sent for ${projects.length} project${projects.length === 1 ? '' : 's'}.`);
         return;
       }
 
       if (message.type === 'list') {
-        const project = this.requireProject(message.projectPath);
-        this.terminalRunner.runCommand(`dotnet list ${quoteForShell(project.path)} package --include-transitive`);
-        await this.postNotice(message.requestId, 'List packages command sent to terminal.');
+        const projects = this.getActionProjects(message.projectPath);
+
+        if (projects.length === 0) {
+          throw new Error('No projects were found for package listing.');
+        }
+
+        for (const project of projects) {
+          this.terminalRunner.runCommand(`dotnet list ${quoteForShell(project.path)} package --include-transitive`);
+        }
+
+        await this.postNotice(message.requestId, `List packages command sent for ${projects.length} project${projects.length === 1 ? '' : 's'}.`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -266,6 +301,22 @@ class NuGetManagerView {
     return project;
   }
 
+  private getActionProjects(projectPath?: string, packageId?: string, action?: string): NuGetManagerProject[] {
+    if (projectPath) {
+      return [this.requireProject(projectPath)];
+    }
+
+    if (!packageId) {
+      return [...this.projects];
+    }
+
+    if (action === 'install') {
+      return this.projects.filter((project) => !hasInstalledPackage(project, packageId));
+    }
+
+    return this.projects.filter((project) => hasInstalledPackage(project, packageId));
+  }
+
   private createHtml(webview: vscode.Webview): string {
     const nonce = createNonce();
 
@@ -284,31 +335,258 @@ class NuGetManagerView {
       color: var(--vscode-foreground);
       background: var(--vscode-editor-background);
     }
+    * {
+      box-sizing: border-box;
+    }
     body {
       margin: 0;
-      padding: 12px;
+      overflow: hidden;
+      background: var(--vscode-editor-background);
+    }
+    .nuget-shell {
+      display: grid;
+      grid-template-rows: 30px 34px 1fr 26px;
+      height: 100vh;
+      min-height: 0;
+      background: var(--vscode-editor-background);
+    }
+    .titlebar {
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-editorGroupHeader-tabsBackground);
+    }
+    .title-caption {
+      display: flex;
+      align-items: center;
+      color: var(--vscode-descriptionForeground);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .3px;
+    }
+    .main-tabs,
+    .sub-tabs {
+      display: flex;
+      align-items: flex-end;
+      gap: 18px;
+      min-width: 0;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-editorGroupHeader-tabsBackground);
+    }
+    .tab-button {
+      height: 34px;
+      padding: 0;
+      color: var(--vscode-descriptionForeground);
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid transparent;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .tab-button.active {
+      color: var(--vscode-foreground);
+      border-bottom-color: var(--vscode-focusBorder);
+    }
+    .page {
+      min-height: 0;
       overflow: hidden;
     }
-    .shell {
+    .page.hidden,
+    .package-list.hidden,
+    .browse-summary.hidden {
+      display: none;
+    }
+    .packages-page {
       display: grid;
-      grid-template-columns: minmax(220px, 30%) 1fr;
-      gap: 12px;
-      height: calc(100vh - 24px);
+      grid-template-rows: 42px 38px 1fr;
       min-height: 0;
     }
-    .pane {
+    .package-toolbar {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) 28px max-content minmax(130px, 160px) max-content max-content;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-editor-background);
+    }
+    #projectSelect {
+      width: auto;
+      min-width: 132px;
+      max-width: 320px;
+    }
+    .search-box {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      align-items: center;
+      height: 28px;
+      border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+      background: var(--vscode-input-background);
+    }
+    .search-icon {
+      display: flex;
+      position: relative;
+      justify-content: center;
+      color: var(--vscode-descriptionForeground);
+    }
+    .search-icon::before {
+      content: "";
+      width: 11px;
+      height: 11px;
+      border: 1.5px solid currentColor;
+      border-radius: 50%;
+    }
+    .search-icon::after {
+      content: "";
+      position: absolute;
+      width: 6px;
+      height: 1.5px;
+      right: 5px;
+      bottom: 7px;
+      background: currentColor;
+      transform: rotate(-45deg);
+      transform-origin: center;
+    }
+    .browse-summary {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-editor-background);
+      color: var(--vscode-foreground);
+      font-size: 15px;
+      font-style: italic;
+      font-weight: 700;
+    }
+    .content-split {
+      display: grid;
+      grid-template-columns: minmax(340px, 49%) 8px minmax(320px, 1fr);
       min-height: 0;
+      height: 100%;
+    }
+    .list-pane {
+      display: grid;
+      grid-template-rows: 34px 1fr;
+      min-width: 0;
+      min-height: 0;
+      background: var(--vscode-editor-background);
+    }
+    .splitter {
+      position: relative;
+      z-index: 2;
+      width: 8px;
+      min-width: 8px;
+      cursor: col-resize;
+      background: linear-gradient(
+        90deg,
+        transparent 0,
+        transparent 3px,
+        var(--vscode-panel-border) 3px,
+        var(--vscode-panel-border) 4px,
+        transparent 4px
+      );
+    }
+    .splitter:hover,
+    .splitter.dragging {
+      background: linear-gradient(
+        90deg,
+        transparent 0,
+        transparent 3px,
+        var(--vscode-focusBorder) 3px,
+        var(--vscode-focusBorder) 5px,
+        transparent 5px
+      );
+    }
+    .splitter::after {
+      content: "< | >";
+      position: absolute;
+      top: 48%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(90deg);
+      padding: 1px 5px;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 3px;
+      color: var(--vscode-descriptionForeground);
+      background: var(--vscode-editor-background);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .splitter:hover::after,
+    .splitter.dragging::after {
+      opacity: 1;
+    }
+    body.resizing,
+    body.resizing * {
+      cursor: col-resize !important;
+      user-select: none;
+    }
+    .details-pane {
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      background: var(--vscode-editor-background);
+    }
+    .sources-page {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 0;
+      padding: 14px;
+      gap: 12px;
+    }
+    .source-editor {
+      display: grid;
+      grid-template-columns: minmax(180px, 260px) minmax(260px, 1fr) max-content;
+      gap: 8px;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+    }
+    .source-editor.editing {
+      padding: 10px;
+      border: 1px solid var(--vscode-focusBorder);
+      background: var(--vscode-list-activeSelectionBackground);
+    }
+    .source-editor-header {
+      display: flex;
+      grid-column: 1 / -1;
+      gap: 8px;
+      align-items: center;
+      min-width: 0;
+      color: var(--vscode-foreground);
+      font-weight: 700;
+    }
+    .source-editor-mode {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--vscode-descriptionForeground);
+      font-weight: 600;
+    }
+    .source-editor-mode.hidden,
+    .source-editor-actions .hidden {
+      display: none;
+    }
+    .source-editor-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+    .source-list {
       overflow: auto;
       border: 1px solid var(--vscode-panel-border);
       background: var(--vscode-sideBar-background);
     }
-    .toolbar, .search {
+    .toolbar-inline {
       display: flex;
       gap: 8px;
       align-items: center;
-      padding: 8px;
-      border-bottom: 1px solid var(--vscode-panel-border);
-      background: var(--vscode-editorGroupHeader-tabsBackground);
     }
     select, input, button {
       height: 28px;
@@ -317,10 +595,15 @@ class NuGetManagerView {
       border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
       font: inherit;
     }
-    input {
+    input[type="text"], input:not([type]) {
       min-width: 0;
-      flex: 1;
       padding: 0 8px;
+    }
+    .search-box input {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      outline: 0;
     }
     button {
       color: var(--vscode-button-foreground);
@@ -328,6 +611,21 @@ class NuGetManagerView {
       border-color: var(--vscode-button-border, transparent);
       padding: 0 10px;
       cursor: pointer;
+    }
+    .icon-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      padding: 0;
+      color: var(--vscode-descriptionForeground);
+      background: transparent;
+      border-color: transparent;
+      font-size: 16px;
+    }
+    .icon-button:hover {
+      color: var(--vscode-foreground);
+      background: var(--vscode-toolbar-hoverBackground);
     }
     button.secondary {
       color: var(--vscode-button-secondaryForeground);
@@ -337,29 +635,101 @@ class NuGetManagerView {
       opacity: .45;
       cursor: default;
     }
+    .checkbox-row {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      white-space: nowrap;
+      color: var(--vscode-descriptionForeground);
+      font-weight: 600;
+    }
+    .checkbox-row input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--vscode-focusBorder);
+    }
     .list {
       display: flex;
       flex-direction: column;
     }
     .row {
       display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-      padding: 8px;
+      grid-template-columns: 22px minmax(0, 1fr) max-content;
+      gap: 7px;
+      align-items: center;
+      min-height: 36px;
+      padding: 5px 8px 5px 16px;
+      cursor: default;
+    }
+    .source-list .source-row {
+      grid-template-columns: minmax(0, 1fr) max-content;
+      gap: 12px;
+      min-height: 58px;
+      padding: 8px 14px;
       border-bottom: 1px solid var(--vscode-panel-border);
     }
+    .source-list .source-row > div:first-child {
+      min-width: 0;
+    }
+    .source-list .source-row .actions {
+      grid-column: 2;
+      flex-wrap: nowrap;
+    }
+    .row:hover,
     .row.active {
       background: var(--vscode-list-activeSelectionBackground);
       color: var(--vscode-list-activeSelectionForeground);
     }
+    .package-list {
+      min-height: 0;
+      overflow: auto;
+      padding-top: 8px;
+    }
+    .pkg-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 2px;
+      color: #f8fafc;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      font-size: 7px;
+      font-weight: 800;
+      line-height: 1;
+    }
     .title {
       font-weight: 600;
-      line-height: 1.35;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-    .meta, .desc {
+    .version-chip {
       color: var(--vscode-descriptionForeground);
-      margin-top: 3px;
-      line-height: 1.35;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .meta,
+    .desc {
+      color: var(--vscode-descriptionForeground);
+      margin-top: 2px;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .row-actions {
+      display: none;
+      gap: 5px;
+      justify-content: flex-end;
+      grid-column: 3;
+    }
+    .row:hover .version-chip {
+      display: none;
+    }
+    .row:hover .row-actions {
+      display: flex;
     }
     .actions {
       display: flex;
@@ -367,12 +737,6 @@ class NuGetManagerView {
       align-items: center;
       flex-wrap: wrap;
       justify-content: flex-end;
-    }
-    .split {
-      display: grid;
-      grid-template-rows: minmax(150px, 42%) 1fr;
-      height: 100%;
-      min-height: 0;
     }
     .section-title {
       padding: 8px;
@@ -387,13 +751,9 @@ class NuGetManagerView {
       padding: 6px 8px;
       color: var(--vscode-descriptionForeground);
       border-top: 1px solid var(--vscode-panel-border);
-    }
-    .source-editor {
-      display: grid;
-      grid-template-columns: 1fr 1.5fr auto;
-      gap: 6px;
-      padding: 8px;
-      border-top: 1px solid var(--vscode-panel-border);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .badge {
       display: inline-flex;
@@ -411,61 +771,126 @@ class NuGetManagerView {
       display: grid;
       grid-template-columns: max-content 1fr;
       gap: 6px 14px;
-      padding: 8px;
+      padding: 16px;
     }
     .details-label {
       color: var(--vscode-descriptionForeground);
       font-weight: 600;
     }
+    .details-actions {
+      justify-content: flex-start;
+      padding: 0 16px 14px;
+    }
+    .project-install-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      padding: 0 16px 16px;
+    }
+    .project-install-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) max-content;
+      gap: 12px;
+      align-items: center;
+      min-height: 34px;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+    }
+    .project-install-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .project-install-version {
+      color: var(--vscode-descriptionForeground);
+      font-weight: 700;
+      white-space: nowrap;
+    }
     .dependencies {
-      padding: 0 8px 10px;
+      padding: 0 16px 14px;
     }
     .dependencies ul {
       margin: 4px 0 8px 18px;
       padding: 0;
     }
-    @media (max-width: 820px) {
-      .shell {
+    @media (max-width: 920px) {
+      .package-toolbar {
+        grid-template-columns: minmax(160px, 1fr) 28px minmax(140px, 1fr);
+        grid-auto-flow: row;
+      }
+      .packages-page {
+        grid-template-rows: auto 36px 1fr;
+      }
+      .content-split {
         grid-template-columns: 1fr;
-        grid-template-rows: 42% 58%;
+        grid-template-rows: minmax(220px, 48%) 1fr;
+      }
+      .splitter {
+        display: none;
+      }
+      .list-pane {
+        border-right: 0;
+        border-bottom: 1px solid var(--vscode-panel-border);
       }
     }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <section class="pane">
-      <div class="toolbar">
+  <div class="nuget-shell">
+    <header class="titlebar">
+      <div class="title-caption">NUGET</div>
+    </header>
+    <nav class="main-tabs" aria-label="NuGet sections">
+      <button id="packagesTabButton" class="tab-button active" type="button">Paketler</button>
+      <button id="sourcesTabButton" class="tab-button" type="button">Kaynaklar</button>
+    </nav>
+    <section id="packagesView" class="page packages-page">
+      <div class="package-toolbar">
+        <div class="search-box">
+          <span class="search-icon" aria-hidden="true"></span>
+          <input id="queryInput" placeholder="Search NuGet packages" />
+        </div>
+        <button id="refreshButton" class="icon-button" title="Refresh" aria-label="Refresh">↻</button>
         <select id="projectSelect" title="Project"></select>
-        <button id="refreshButton" class="secondary">Refresh</button>
+        <select id="sourceSelect" title="Package source"></select>
+        <label class="checkbox-row"><input id="prereleaseInput" type="checkbox" /> Prerelease</label>
+        <button id="searchButton">Search</button>
       </div>
-      <div class="section-title">Installed Packages</div>
-      <div id="installedList" class="list"></div>
-      <div class="section-title">Package Sources</div>
-      <div id="sourcesList" class="list"></div>
-      <div class="source-editor">
+      <div id="browseSummary" class="browse-summary">Available Packages: Top 100</div>
+      <div id="contentSplit" class="content-split">
+        <section class="list-pane">
+          <div class="sub-tabs" aria-label="Package list mode">
+            <button id="browseTabButton" class="tab-button active" type="button">ARA</button>
+            <button id="installedTabButton" class="tab-button" type="button">YUKLU</button>
+          </div>
+          <div id="searchResults" class="list package-list"></div>
+          <div id="installedList" class="list package-list hidden"></div>
+        </section>
+        <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize package details panel" title="< | >"></div>
+        <section class="details-pane">
+          <div class="section-title">Details</div>
+          <div id="details" class="empty">Select a package to view details.</div>
+        </section>
+      </div>
+    </section>
+    <section id="sourcesView" class="page sources-page hidden">
+      <div id="sourceEditor" class="source-editor">
+        <div class="source-editor-header">
+          <span id="sourceEditorTitle">Add Package Source</span>
+          <span id="sourceEditorMode" class="source-editor-mode hidden"></span>
+        </div>
         <input id="sourceNameInput" placeholder="Source name" />
         <input id="sourceUrlInput" placeholder="https://api.nuget.org/v3/index.json" />
-        <button id="saveSourceButton">Add</button>
-      </div>
-    </section>
-    <section class="pane split">
-      <div>
-        <div class="search">
-          <input id="queryInput" placeholder="Search NuGet packages" />
-          <label><input id="prereleaseInput" type="checkbox" style="height:auto" /> Prerelease</label>
-          <select id="sourceSelect" title="Package source"></select>
-          <button id="searchButton">Search</button>
+        <div class="source-editor-actions">
+          <button id="saveSourceButton">Add</button>
+          <button id="cancelSourceButton" class="secondary hidden">Cancel</button>
         </div>
-        <div id="searchResults" class="list"></div>
       </div>
-      <div>
-        <div class="section-title">Details</div>
-        <div id="details" class="empty">Select a package to view details.</div>
-      </div>
+      <div id="sourcesList" class="list source-list"></div>
     </section>
+    <div id="status" class="status">Ready</div>
   </div>
-  <div id="status" class="status">Ready</div>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const state = {
@@ -475,6 +900,8 @@ class NuGetManagerView {
       selectedPackage: undefined,
       selectedDetails: undefined,
       editingSourceUrl: '',
+      activeMainTab: 'packages',
+      activePackageTab: 'browse',
       searchResults: []
     };
     let nextRequestId = 1;
@@ -493,8 +920,8 @@ class NuGetManagerView {
       if (message.projects) {
         state.projects = message.projects;
         state.sources = message.sources || [];
-        if (!state.selectedProjectPath && state.projects[0]) {
-          state.selectedProjectPath = state.projects[0].path;
+        if (state.selectedProjectPath && !state.projects.some((project) => project.path === state.selectedProjectPath)) {
+          state.selectedProjectPath = '';
         }
         render();
       }
@@ -524,13 +951,20 @@ class NuGetManagerView {
       state.selectedProjectPath = event.target.value;
       renderInstalled();
     });
+    $('packagesTabButton').addEventListener('click', () => setMainTab('packages'));
+    $('sourcesTabButton').addEventListener('click', () => setMainTab('sources'));
+    $('browseTabButton').addEventListener('click', () => setPackageTab('browse'));
+    $('installedTabButton').addEventListener('click', () => setPackageTab('installed'));
     $('searchButton').addEventListener('click', search);
     $('saveSourceButton').addEventListener('click', saveSource);
+    $('cancelSourceButton').addEventListener('click', resetSourceEditor);
     $('queryInput').addEventListener('keydown', (event) => {
       if (event.key === 'Enter') search();
     });
+    initializeSplitter();
 
     async function search() {
+      setPackageTab('browse');
       setStatus('Searching...');
       await request('search', {
         query: $('queryInput').value,
@@ -541,27 +975,48 @@ class NuGetManagerView {
     }
 
     function render() {
-      $('projectSelect').innerHTML = state.projects.map((project) =>
+      $('projectSelect').innerHTML = '<option value=""' + (!state.selectedProjectPath ? ' selected' : '') + '>All Solution</option>' + state.projects.map((project) =>
         '<option value="' + escapeAttribute(project.path) + '"' + (project.path === state.selectedProjectPath ? ' selected' : '') + '>' + escapeHtml(project.name) + '</option>'
       ).join('');
-      $('sourceSelect').innerHTML = '<option value="">All sources</option>' + state.sources.map((source) =>
+      $('sourceSelect').innerHTML = '<option value="">All Source</option>' + state.sources.map((source) =>
         '<option value="' + escapeAttribute(source.url) + '">' + escapeHtml(source.name) + '</option>'
       ).join('');
+      renderTabs();
       renderInstalled();
       renderSources();
       renderSearchResults();
     }
 
+    function renderTabs() {
+      $('packagesView').classList.toggle('hidden', state.activeMainTab !== 'packages');
+      $('sourcesView').classList.toggle('hidden', state.activeMainTab !== 'sources');
+      $('packagesTabButton').classList.toggle('active', state.activeMainTab === 'packages');
+      $('sourcesTabButton').classList.toggle('active', state.activeMainTab === 'sources');
+      $('browseSummary').classList.toggle('hidden', state.activePackageTab !== 'browse');
+      $('searchResults').classList.toggle('hidden', state.activePackageTab !== 'browse');
+      $('installedList').classList.toggle('hidden', state.activePackageTab !== 'installed');
+      $('browseTabButton').classList.toggle('active', state.activePackageTab === 'browse');
+      $('installedTabButton').classList.toggle('active', state.activePackageTab === 'installed');
+    }
+
+    function setMainTab(tab) {
+      state.activeMainTab = tab;
+      renderTabs();
+    }
+
+    function setPackageTab(tab) {
+      state.activePackageTab = tab;
+      renderTabs();
+    }
+
     function renderInstalled() {
-      const project = selectedProject();
-      const packages = project ? project.packages : [];
+      const packages = installedPackages();
       $('installedList').innerHTML = packages.length ? packages.map((pkg) => packageRow(pkg, true)).join('') : '<div class="empty">No PackageReference items found.</div>';
       document.querySelectorAll('#installedList [data-select-package]').forEach((row) => row.addEventListener('click', () => {
         const pkg = packages.find((item) => (item.id || item.name) === row.dataset.selectPackage);
         state.selectedPackage = pkg;
-        state.selectedDetails = undefined;
+        state.selectedDetails = { installedOnly: true };
         renderDetails();
-        loadDetails(pkg.id || pkg.name, pkg.version || pkg.centralVersion);
       }));
       document.querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -579,7 +1034,7 @@ class NuGetManagerView {
         const actions = source.editable
           ? '<button class="secondary" data-edit-source="' + escapeAttribute(source.url) + '">Edit</button><button data-remove-source="' + escapeAttribute(source.url) + '">Remove</button>'
           : '';
-        return '<div class="row"><div><div class="title">' + escapeHtml(source.name) + badge + '</div><div class="meta">' + escapeHtml(source.url) + '</div></div><div class="actions">' + actions + '</div></div>';
+        return '<div class="row source-row"><div><div class="title">' + escapeHtml(source.name) + badge + '</div><div class="meta">' + escapeHtml(source.url) + '</div></div><div class="actions">' + actions + '</div></div>';
       }).join('') : '<div class="empty">No package sources found.</div>';
       document.querySelectorAll('[data-edit-source]').forEach((button) => button.addEventListener('click', () => editSource(button.dataset.editSource)));
       document.querySelectorAll('[data-remove-source]').forEach((button) => button.addEventListener('click', () => removeSource(button.dataset.removeSource)));
@@ -587,7 +1042,7 @@ class NuGetManagerView {
 
     function renderSearchResults() {
       $('searchResults').innerHTML = state.searchResults.length ? state.searchResults.map((pkg) => packageRow(pkg, false)).join('') : '<div class="empty">Search for packages to install.</div>';
-      document.querySelectorAll('[data-select-package]').forEach((row) => row.addEventListener('click', () => {
+      document.querySelectorAll('#searchResults [data-select-package]').forEach((row) => row.addEventListener('click', () => {
         const pkg = state.searchResults.find((item) => item.id === row.dataset.selectPackage);
         state.selectedPackage = pkg;
         state.selectedDetails = undefined;
@@ -606,6 +1061,10 @@ class NuGetManagerView {
       const pkg = state.selectedPackage;
       if (!pkg) {
         $('details').innerHTML = '<div class="empty">Select a package to view details.</div>';
+        return;
+      }
+      if (state.selectedDetails && state.selectedDetails.installedOnly) {
+        renderInstalledPackageDetails(pkg);
         return;
       }
       const details = state.selectedDetails;
@@ -627,6 +1086,26 @@ class NuGetManagerView {
       $('details').querySelector('#versionSelect').addEventListener('change', (event) => loadDetails(pkg.id, event.target.value, pkg.sourceUrl));
     }
 
+    function renderInstalledPackageDetails(pkg) {
+      const projects = pkg.installedProjects || [];
+      const versionText = pkg.version || pkg.centralVersion || (pkg.projectCount ? 'multiple' : '');
+      $('details').innerHTML =
+        '<div class="details-grid">' +
+        '<div class="details-label">Package</div><div><strong>' + escapeHtml(pkg.id || pkg.name) + '</strong></div>' +
+        '<div class="details-label">Version</div><div>' + escapeHtml(versionText || 'unspecified') + '</div>' +
+        '<div class="details-label">Installed in</div><div>' + projects.length + ' project' + (projects.length === 1 ? '' : 's') + '</div>' +
+        '</div>' +
+        '<div class="section-title">Installed Projects</div>' +
+        '<div class="project-install-list">' +
+        (projects.length ? projects.map((project) =>
+          '<div class="project-install-row">' +
+          '<div><div class="project-install-name">' + escapeHtml(project.name) + '</div><div class="meta">' + escapeHtml(project.relativePath || project.path || '') + '</div></div>' +
+          '<div class="project-install-version">' + escapeHtml(project.version || 'unspecified') + '</div>' +
+          '</div>'
+        ).join('') : '<div class="empty">This package is not installed in the selected scope.</div>') +
+        '</div>';
+    }
+
     function renderDependencies(groups) {
       if (!groups.length) {
         return '<div class="empty">No dependencies.</div>';
@@ -636,6 +1115,51 @@ class NuGetManagerView {
         (group.dependencies && group.dependencies.length ? group.dependencies.map((dep) => '<li>' + escapeHtml(dep.id) + ' ' + escapeHtml(dep.range || '') + '</li>').join('') : '<li>No dependencies</li>') +
         '</ul>'
       ).join('') + '</div>';
+    }
+
+    function initializeSplitter() {
+      const split = $('contentSplit');
+      const splitter = $('splitter');
+      if (!split || !splitter) return;
+
+      const minLeft = 280;
+      const minRight = 340;
+      const splitterWidth = 8;
+
+      function applyWidth(clientX) {
+        const bounds = split.getBoundingClientRect();
+        if (!bounds.width) return;
+        const maxLeft = Math.max(minLeft, bounds.width - minRight - splitterWidth);
+        const nextLeft = Math.min(Math.max(clientX - bounds.left, minLeft), maxLeft);
+        split.style.gridTemplateColumns = nextLeft + 'px ' + splitterWidth + 'px minmax(' + minRight + 'px, 1fr)';
+      }
+
+      splitter.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        splitter.classList.add('dragging');
+        document.body.classList.add('resizing');
+        splitter.setPointerCapture(event.pointerId);
+        applyWidth(event.clientX);
+      });
+
+      splitter.addEventListener('pointermove', (event) => {
+        if (!splitter.classList.contains('dragging')) return;
+        applyWidth(event.clientX);
+      });
+
+      function stopResize(event) {
+        splitter.classList.remove('dragging');
+        document.body.classList.remove('resizing');
+        if (event && splitter.hasPointerCapture(event.pointerId)) {
+          splitter.releasePointerCapture(event.pointerId);
+        }
+      }
+
+      splitter.addEventListener('pointerup', stopResize);
+      splitter.addEventListener('pointercancel', stopResize);
+      splitter.addEventListener('dblclick', () => {
+        split.style.gridTemplateColumns = '';
+      });
     }
 
     async function loadDetails(packageId, version, sourceUrl) {
@@ -651,15 +1175,18 @@ class NuGetManagerView {
     function packageRow(pkg, installed) {
       const id = pkg.id || pkg.name;
       const version = pkg.version || pkg.centralVersion || '';
-      const installedMeta = installed ? 'Version: ' + escapeHtml(version || 'unspecified') + (pkg.versionSource ? ' · ' + escapeHtml(pkg.versionSource) : '') : 'Latest: ' + escapeHtml(version || '');
+      const projectMeta = installed && pkg.projectCount ? ' · ' + pkg.projectCount + ' project' + (pkg.projectCount === 1 ? '' : 's') : '';
+      const author = pkg.authors ? ' @' + escapeHtml(pkg.authors) : '';
+      const installedMeta = installed ? 'Version: ' + escapeHtml(version || 'multiple') + (pkg.versionSource ? ' · ' + escapeHtml(pkg.versionSource) : '') + projectMeta : 'Latest: ' + escapeHtml(version || '');
+      const title = '<span class="title">' + escapeHtml(id) + '</span>' + author;
+      const versionChip = '<span class="version-chip">' + escapeHtml(version || (installed ? 'multiple' : '')) + '</span>';
       const action = installed
         ? '<button class="secondary" data-list="' + escapeAttribute(id) + '">List</button><button data-remove="' + escapeAttribute(id) + '">Remove</button>'
         : '<button data-install="' + escapeAttribute(id) + '">' + (isInstalled(id) ? 'Update' : 'Install') + '</button>';
-      return '<div class="row" data-select-package="' + escapeAttribute(id) + '"><div><div class="title">' + escapeHtml(id) + '</div><div class="meta">' + installedMeta + '</div><div class="desc">' + escapeHtml(pkg.description || '') + '</div></div><div class="actions">' + action + '</div></div>';
+      return '<div class="row" data-select-package="' + escapeAttribute(id) + '"><span class="pkg-icon">.NET</span><div><div>' + title + '</div><div class="meta">' + installedMeta + '</div><div class="desc">' + escapeHtml(pkg.description || '') + '</div></div>' + versionChip + '<div class="row-actions">' + action + '</div></div>';
     }
 
     async function runPackageAction(type, packageId, version, sourceUrl) {
-      if (!state.selectedProjectPath) return;
       setStatus(type + ' ' + packageId + '...');
       await request(type, {
         projectPath: state.selectedProjectPath,
@@ -681,11 +1208,15 @@ class NuGetManagerView {
         sourceName,
         sourceUrl
       });
+      resetSourceEditor();
+      setStatus('Source saved');
+    }
+
+    function resetSourceEditor() {
       state.editingSourceUrl = '';
       $('sourceNameInput').value = '';
       $('sourceUrlInput').value = '';
-      $('saveSourceButton').textContent = 'Add';
-      setStatus('Source saved');
+      setSourceEditorMode();
     }
 
     function editSource(sourceUrl) {
@@ -694,10 +1225,26 @@ class NuGetManagerView {
       state.editingSourceUrl = source.url;
       $('sourceNameInput').value = source.name;
       $('sourceUrlInput').value = source.url;
-      $('saveSourceButton').textContent = 'Save';
+      setSourceEditorMode(source);
+      setStatus('Editing package source: ' + source.name);
+      $('sourceNameInput').focus();
+      $('sourceNameInput').select();
+    }
+
+    function setSourceEditorMode(source) {
+      const isEditing = Boolean(source);
+      $('sourceEditor').classList.toggle('editing', isEditing);
+      $('sourceEditorTitle').textContent = isEditing ? 'Edit Package Source' : 'Add Package Source';
+      $('sourceEditorMode').textContent = isEditing ? 'Editing: ' + source.name : '';
+      $('sourceEditorMode').classList.toggle('hidden', !isEditing);
+      $('saveSourceButton').textContent = isEditing ? 'Save' : 'Add';
+      $('cancelSourceButton').classList.toggle('hidden', !isEditing);
     }
 
     async function removeSource(sourceUrl) {
+      if (state.editingSourceUrl === sourceUrl) {
+        resetSourceEditor();
+      }
       await request('removeSource', { sourceUrl });
       setStatus('Source removed');
     }
@@ -706,9 +1253,70 @@ class NuGetManagerView {
       return state.projects.find((project) => project.path === state.selectedProjectPath);
     }
 
-    function isInstalled(packageId) {
+    function scopedProjects() {
       const project = selectedProject();
-      return Boolean(project && project.packages.some((pkg) => String(pkg.id).toLowerCase() === String(packageId).toLowerCase()));
+      return project ? [project] : state.projects;
+    }
+
+    function installedPackages() {
+      const projects = scopedProjects();
+
+      if (selectedProject()) {
+        return (projects[0].packages || []).map((pkg) => ({
+          ...pkg,
+          projectCount: 1,
+          installedProjects: [createInstalledProjectEntry(projects[0], pkg)]
+        }));
+      }
+
+      const grouped = new Map();
+      projects.forEach((project) => {
+        (project.packages || []).forEach((pkg) => {
+          const id = pkg.id || pkg.name;
+          if (!id) return;
+          const key = String(id).toLowerCase();
+          const existing = grouped.get(key) || {
+            ...pkg,
+            id,
+            name: id,
+            versions: new Set(),
+            sources: new Set(),
+            installedProjects: [],
+            projectCount: 0
+          };
+          existing.projectCount += 1;
+          existing.installedProjects.push(createInstalledProjectEntry(project, pkg));
+          if (pkg.version || pkg.centralVersion) existing.versions.add(pkg.version || pkg.centralVersion);
+          if (pkg.versionSource) existing.sources.add(pkg.versionSource);
+          grouped.set(key, existing);
+        });
+      });
+
+      return Array.from(grouped.values()).map((pkg) => {
+        const versions = Array.from(pkg.versions);
+        const sources = Array.from(pkg.sources);
+        return {
+          ...pkg,
+          version: versions.length === 1 ? versions[0] : '',
+          versionSource: sources.length === 1 ? sources[0] : ''
+        };
+      }).sort((left, right) => String(left.id || '').localeCompare(String(right.id || ''), undefined, { sensitivity: 'base' }));
+    }
+
+    function createInstalledProjectEntry(project, pkg) {
+      return {
+        name: project.name,
+        path: project.path,
+        relativePath: project.relativePath,
+        version: pkg.version || pkg.centralVersion || pkg.resolvedVersion || '',
+        versionSource: pkg.versionSource || ''
+      };
+    }
+
+    function isInstalled(packageId) {
+      return scopedProjects().some((project) => {
+        return (project.packages || []).some((pkg) => String(pkg.id).toLowerCase() === String(packageId).toLowerCase());
+      });
     }
 
     function setStatus(value) {
@@ -1014,6 +1622,10 @@ function findPackageReference(project: NuGetManagerProject, packageId: string): 
   return (project.metadata?.packageReferences || []).find((reference) => {
     return normalizePackageId(reference.name || reference.include || '') === normalized;
   });
+}
+
+function hasInstalledPackage(project: NuGetManagerProject, packageId: string): boolean {
+  return Boolean(findPackageReference(project, packageId));
 }
 
 function findCentralPackageVersion(project: NuGetManagerProject, packageId: string): NuGetPackageReference | undefined {
