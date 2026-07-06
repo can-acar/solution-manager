@@ -34,7 +34,7 @@ class NuGetProtocolHost {
     });
   }
 
-  async search(sourceUrl: string, query: string, prerelease: boolean, skip = 0, take = 50): Promise<any[]> {
+  async search(sourceUrl: string, query: string, prerelease: boolean, skip = 0, take = 100): Promise<any[]> {
     return this.send<any[]>({
       Command: 'search',
       SourceUrl: sourceUrl,

@@ -95,6 +95,10 @@ function validateManifest() {
     'NuGet Manager sources setting is not contributed.'
   );
   assert(
+    configurationProperties['solutionManager.nuget.hiddenSources'],
+    'NuGet Manager hidden sources setting is not contributed.'
+  );
+  assert(
     configurationProperties['solutionManager.nuget.skipRestore'],
     'NuGet Manager skip restore setting is not contributed.'
   );
@@ -375,6 +379,10 @@ function validateNuGetManagerView() {
             return ['{"name":"nuget.org","url":"https://api.nuget.org/v3/index.json"}'];
           }
 
+          if (key === 'hiddenSources') {
+            return [];
+          }
+
           if (key === 'skipRestore') {
             return false;
           }
@@ -413,8 +421,20 @@ function validateNuGetManagerView() {
     assert(nugetManagerSource.includes('Paketler'), 'NuGet Manager does not expose the packages tab.');
     assert(nugetManagerSource.includes('Kaynaklar'), 'NuGet Manager does not expose the sources tab.');
     assert(nugetManagerSource.includes('activePackageTab'), 'NuGet Manager does not expose package browse/installed tab state.');
+    assert(nugetManagerSource.includes('installed-mode'), 'NuGet Manager does not switch the package layout for installed packages.');
+    assert(nugetManagerSource.includes('.packages-page.installed-mode .content-split'), 'NuGet Manager installed layout can collapse into the browse summary grid row.');
     assert(nugetManagerSource.includes('renderInstalledPackageDetails'), 'NuGet Manager does not render installed package project details.');
     assert(nugetManagerSource.includes('installedProjects'), 'NuGet Manager installed package grouping does not keep project ownership.');
+    assert(nugetManagerSource.includes('renderPackageProjectSection'), 'NuGet Manager browse details do not list installed projects.');
+    assert(nugetManagerSource.includes('data-update-project'), 'NuGet Manager installed project rows do not expose project-scoped update actions.');
+    assert(nugetManagerSource.includes('data-remove-project'), 'NuGet Manager installed project rows do not expose project-scoped remove actions.');
+    assert(nugetManagerSource.includes("message.type === 'openProject'"), 'NuGet Manager installed project rows do not open project files.');
+    assert(nugetManagerSource.includes('projectSelectionModal'), 'NuGet Manager All Solution install flow does not expose a project picker modal.');
+    assert(nugetManagerSource.includes('projectPaths'), 'NuGet Manager package actions do not support selected project paths.');
+    assert(nugetManagerSource.includes('installCandidateProjects'), 'NuGet Manager project picker does not filter install candidates.');
+    assert(nugetManagerSource.includes('packageActionState'), 'NuGet Manager package actions are not based on install/update/up-to-date state.');
+    assert(nugetManagerSource.includes('applyPackageActionToState'), 'NuGet Manager package actions do not update local package state after success.');
+    assert(nugetManagerSource.includes('updateCandidateProjects'), 'NuGet Manager package update actions do not filter already-current projects.');
 
     const packageInfo = __test.mapProtocolPackage({
       Id: 'Newtonsoft.Json',
@@ -460,6 +480,7 @@ function validateNuGetManagerView() {
 
     assert(sources.some((source) => source.name === 'private'), 'Project NuGet.config source was not included.');
     assert(sources.some((source) => source.name === 'global'), 'Protocol host NuGet source was not included.');
+    assert(sources.every((source) => source.editable), 'NuGet Manager should expose edit/remove actions for all sources.');
   } finally {
     Module._load = originalLoad;
   }

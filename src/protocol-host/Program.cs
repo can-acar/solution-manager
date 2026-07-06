@@ -546,7 +546,7 @@ internal sealed record ProtocolRequest
     public string? Filter { get; init; }
     public bool Prerelease { get; init; } = true;
     public int Skip { get; init; }
-    public int Take { get; init; } = 50;
+    public int Take { get; init; } = 100;
     public string[]? WorkspaceFolders { get; init; }
 }
 

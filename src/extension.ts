@@ -128,14 +128,11 @@ function registerDevelopmentAutoReload(context) {
   }
 
   const activatedAt = Date.now();
+  const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  let buildTimer;
+  let buildInProgress = false;
+  let pendingBuildScript;
   let reloadTimer;
-  const patterns = [
-    'dist/**/*.js',
-    'dist/**/*.json',
-    'dist/protocol-host/**/*',
-    'media/**/*',
-    'package.json'
-  ];
 
   const scheduleReload = () => {
     if (Date.now() - activatedAt < 1500) {
@@ -151,16 +148,74 @@ function registerDevelopmentAutoReload(context) {
     }, 600);
   };
 
-  for (const pattern of patterns) {
+  const scheduleBuildAndReload = (script) => {
+    if (Date.now() - activatedAt < 1500) {
+      return;
+    }
+
+    pendingBuildScript = script;
+
+    if (buildTimer) {
+      clearTimeout(buildTimer);
+    }
+
+    buildTimer = setTimeout(() => runPendingBuild(), 450);
+  };
+
+  const runPendingBuild = () => {
+    if (buildInProgress || !pendingBuildScript) {
+      return;
+    }
+
+    const script = pendingBuildScript;
+    pendingBuildScript = undefined;
+    buildInProgress = true;
+
+    execFile(
+      npmCommand,
+      ['run', script],
+      {
+        cwd: context.extensionPath,
+        maxBuffer: 1024 * 1024 * 5
+      },
+      (error) => {
+        buildInProgress = false;
+
+        if (error) {
+          vscode.window.showErrorMessage(`Solution Manager development build failed: npm run ${script}`);
+          return;
+        }
+
+        scheduleReload();
+
+        if (pendingBuildScript) {
+          runPendingBuild();
+        }
+      }
+    );
+  };
+
+  const registerWatcher = (pattern, handler) => {
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(context.extensionPath, pattern));
-    watcher.onDidCreate(scheduleReload, undefined, context.subscriptions);
-    watcher.onDidChange(scheduleReload, undefined, context.subscriptions);
-    watcher.onDidDelete(scheduleReload, undefined, context.subscriptions);
+    watcher.onDidCreate(handler, undefined, context.subscriptions);
+    watcher.onDidChange(handler, undefined, context.subscriptions);
+    watcher.onDidDelete(handler, undefined, context.subscriptions);
     context.subscriptions.push(watcher);
-  }
+  };
+
+  registerWatcher('src/**/*.ts', () => scheduleBuildAndReload('compile:ts'));
+  registerWatcher('src/protocol-host/**/*.cs', () => scheduleBuildAndReload('compile:protocol-host'));
+  registerWatcher('src/protocol-host/**/*.csproj', () => scheduleBuildAndReload('compile:protocol-host'));
+  registerWatcher('dist/**/*.js', scheduleReload);
+  registerWatcher('dist/**/*.json', scheduleReload);
+  registerWatcher('media/**/*', scheduleReload);
+  registerWatcher('package.json', scheduleReload);
 
   context.subscriptions.push({
     dispose: () => {
+      if (buildTimer) {
+        clearTimeout(buildTimer);
+      }
       if (reloadTimer) {
         clearTimeout(reloadTimer);
       }

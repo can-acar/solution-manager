@@ -2,7 +2,7 @@
   "name": "solution-manager",
   "displayName": "Solution Manager",
   "description": "Rider-style Solution view for .sln and .slnx files, projects, folders, and files.",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "publisher": "local",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
@@ -160,6 +160,15 @@
             "{\"name\":\"nuget.org\",\"url\":\"https://api.nuget.org/v3/index.json\"}"
           ],
           "description": "Editable NuGet package sources used by Solution Manager. Each item is a JSON object with name and url."
+        },
+        "solutionManager.nuget.hiddenSources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "default": [],
+          "description": "NuGet package source URLs hidden from Solution Manager after removal."
         }
       }
     },
@@ -1830,6 +1839,7 @@
     "compile": "npm run compile:ts && npm run compile:protocol-host",
     "compile:ts": "tsc -p tsconfig.json",
     "compile:protocol-host": "dotnet publish src/protocol-host/CanNugetGallery.ProtocolHost.csproj -c Release -o dist/protocol-host --nologo",
+    "dev:compile": "npm run compile",
     "dev:watch": "npm run compile:protocol-host && npm run watch:ts",
     "watch:ts": "tsc -watch -p tsconfig.json --preserveWatchOutput",
     "watch:protocol-host": "dotnet watch --project src/protocol-host/CanNugetGallery.ProtocolHost.csproj publish -c Release -o dist/protocol-host --nologo",
