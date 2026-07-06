@@ -70,7 +70,7 @@ const PACKAGE_ASSET_GROUPS = [
 ];
 
 function readLibraryAssetGroups(targetLibrary = {}) {
-  const result = {};
+  const result: Record<string, unknown> = {};
   const packageAssetGroups = [];
 
   for (const [key, label] of PACKAGE_ASSET_GROUPS) {
@@ -164,7 +164,7 @@ function sortPackages(packages) {
   });
 }
 
-module.exports = {
+export {
   PACKAGE_ASSET_GROUPS,
   readProjectAssetsFromText
 };

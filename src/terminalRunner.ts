@@ -1,11 +1,13 @@
-const vscode = require('vscode');
+import * as vscode from 'vscode';
 
 class TerminalRunner {
+  terminal?: import('vscode').Terminal;
+
   constructor() {
     this.terminal = undefined;
   }
 
-  run(action, item) {
+  run(action: string, item: { path?: string }) {
     if (!item || !item.path) {
       throw new Error('A solution or project path is required.');
     }
@@ -15,13 +17,13 @@ class TerminalRunner {
     return command;
   }
 
-  runCommand(command) {
+  runCommand(command: string) {
     this.getTerminal().show();
     this.getTerminal().sendText(command);
     return command;
   }
 
-  getTerminal() {
+  getTerminal(): import('vscode').Terminal {
     if (!this.terminal || this.terminal.exitStatus) {
       this.terminal = vscode.window.createTerminal({
         name: 'Solution Manager'
@@ -32,7 +34,7 @@ class TerminalRunner {
   }
 }
 
-function quoteForShell(value) {
+function quoteForShell(value: string) {
   if (process.platform === 'win32') {
     return `"${value.replace(/"/g, '\\"')}"`;
   }
@@ -40,7 +42,7 @@ function quoteForShell(value) {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-module.exports = {
+export {
   TerminalRunner,
   quoteForShell
 };

@@ -1,4 +1,5 @@
-const vscode = require('vscode');
+// @ts-nocheck
+import * as vscode from 'vscode';
 
 function updateProjectPropertiesInText(text, updates) {
   const entries = normalizeUpdates(updates);
@@ -504,7 +505,7 @@ function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-module.exports = {
+export {
   removeProjectConfiguration,
   removeProjectConfigurationInText,
   updateProjectProperties,

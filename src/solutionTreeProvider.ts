@@ -1,14 +1,16 @@
-const os = require('os');
-const path = require('path');
-const vscode = require('vscode');
-const { ProjectActions } = require('./projectActions');
-const { PACKAGE_ASSET_GROUPS } = require('./projectAssetsReader');
-const { updateProjectItemReferences } = require('./projectFileEditor');
-const { TerminalRunner, quoteForShell } = require('./terminalRunner');
-const {
+// @ts-nocheck
+import * as os from 'os';
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { ProjectActions } from '#src/projectActions';
+import { SolutionActions } from '#src/solutionActions';
+import { PACKAGE_ASSET_GROUPS } from '#src/projectAssetsReader';
+import { updateProjectItemReferences } from '#src/projectFileEditor';
+import { TerminalRunner, quoteForShell } from '#src/terminalRunner';
+import {
   WorkspaceScanner,
   enrichPackagesWithPackageSourceMappings
-} = require('./workspaceScanner');
+} from '#src/workspaceScanner';
 
 const UNLOADED_PROJECTS_KEY = 'solutionManager.unloadedProjects';
 const PROJECT_EXTENSIONS = new Set(['.csproj', '.fsproj', '.vbproj', '.proj']);
@@ -38,6 +40,15 @@ class SolutionTreeProvider {
       (options) => this.refresh(options),
       () => this.getState()
     );
+    this.solutionActions = new SolutionActions(context, this.terminalRunner, {
+      refresh: (options) => this.refresh(options),
+      getState: () => this.getState(),
+      openUri: (uri) => this.openUri(uri),
+      addCustomItems: (uris) => this.scanner.addCustomItems(uris),
+      runProjectAction: (action, node) => this.runProjectAction(action, node),
+      getUnloadedProjectUris: () => this.getUnloadedProjectUris(),
+      setUnloadedProjectUris: (uris) => this.setUnloadedProjectUris(uris)
+    });
     this.onDidChangeTreeDataEmitter = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
     this.currentState = undefined;
@@ -421,6 +432,15 @@ class SolutionTreeProvider {
     }
   }
 
+  async runSolutionAction(action, node) {
+    try {
+      await this.solutionActions.run(action, node);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`Solution Manager: ${message}`);
+    }
+  }
+
   async runDependencyAction(action, node) {
     try {
       if (action === 'dependencyDetails' && (node?.kind === 'dependencies' || node?.kind === 'dependencyImports' || node?.kind === 'dependencyGroup')) {
@@ -743,6 +763,10 @@ class SolutionTreeProvider {
     return new Set(this.context.workspaceState.get(UNLOADED_PROJECTS_KEY, []));
   }
 
+  async setUnloadedProjectUris(uris) {
+    await this.context.workspaceState.update(UNLOADED_PROJECTS_KEY, [...uris]);
+  }
+
   updateViewTitle(state) {
     if (!this.treeView || !state) {
       return;
@@ -831,7 +855,7 @@ class SolutionTreeProvider {
 function createSolutionNode(solution, state) {
   const projects = getProjectsForSolution(solution, state);
   const unloadedProjects = state.unloadedProjects || new Set();
-  const children = buildGroupedProjectNodes(projects, unloadedProjects);
+  const children = buildGroupedProjectNodes(projects, unloadedProjects, solution.solutionFolders);
   const projectCount = projects.length;
   const unloadedCount = (solution.unloadedCount || 0)
     + projects.filter((project) => unloadedProjects.has(project.uri)).length;
@@ -863,37 +887,47 @@ function getProjectsForSolution(solution, state) {
   return [];
 }
 
-function buildGroupedProjectNodes(projects, unloadedProjects) {
+function buildGroupedProjectNodes(projects, unloadedProjects, solutionFolders = []) {
   const root = [];
+
+  for (const folder of solutionFolders || []) {
+    ensureGroupPath(root, Array.isArray(folder.path) ? folder.path : []);
+  }
 
   for (const project of projects) {
     const groupParts = getProjectGroupParts(project);
-    let target = root;
-    let groupId = '';
-
-    for (const part of groupParts) {
-      groupId = groupId ? `${groupId}/${part}` : part;
-      let groupNode = target.find((node) => node.kind === 'group' && node.label === part);
-
-      if (!groupNode) {
-        groupNode = {
-          id: `group:${groupId}`,
-          kind: 'group',
-          label: part,
-          children: [],
-          collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
-          contextValue: 'group'
-        };
-        target.push(groupNode);
-      }
-
-      target = groupNode.children;
-    }
+    const target = ensureGroupPath(root, groupParts);
 
     target.push(createProjectNode(project, unloadedProjects));
   }
 
   return addGroupProjectCounts(sortNodes(root));
+}
+
+function ensureGroupPath(root, groupParts) {
+  let target = root;
+  let groupId = '';
+
+  for (const part of groupParts) {
+    groupId = groupId ? `${groupId}/${part}` : part;
+    let groupNode = target.find((node) => node.kind === 'group' && node.label === part);
+
+    if (!groupNode) {
+      groupNode = {
+        id: `group:${groupId}`,
+        kind: 'group',
+        label: part,
+        children: [],
+        collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
+        contextValue: 'group'
+      };
+      target.push(groupNode);
+    }
+
+    target = groupNode.children;
+  }
+
+  return target;
 }
 
 function createProjectNode(project, unloadedProjects = new Set()) {
@@ -2562,21 +2596,23 @@ function capitalize(value) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-module.exports = {
+const __test = {
+  createDependencyReferenceXml,
+  createDependencyFrameworkDetailsMarkdown,
+  createDependencyNodeDetailsMarkdown,
+  createDependencyPackageDetailsMarkdown,
+  createPackageSourceMappingXml,
+  createPackageReferenceMetadata,
+  createPackageReferenceXml,
+  getPackageAssetPath,
+  getPackageFolderPath,
+  mergeResolvedProjectReference,
+  mergeResolvedFrameworkReference,
+  mergeResolvedPackageReference,
+  normalizeNuGetPackageVersion
+};
+
+export {
   SolutionTreeProvider,
-  __test: {
-    createDependencyReferenceXml,
-    createDependencyFrameworkDetailsMarkdown,
-    createDependencyNodeDetailsMarkdown,
-    createDependencyPackageDetailsMarkdown,
-    createPackageSourceMappingXml,
-    createPackageReferenceMetadata,
-    createPackageReferenceXml,
-    getPackageAssetPath,
-    getPackageFolderPath,
-    mergeResolvedProjectReference,
-    mergeResolvedFrameworkReference,
-    mergeResolvedPackageReference,
-    normalizeNuGetPackageVersion
-  }
+  __test
 };

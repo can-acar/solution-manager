@@ -4,15 +4,19 @@ const Module = require('module');
 const path = require('path');
 
 const files = [
-  'src/extension.js',
-  'src/launchSettingsEditor.js',
-  'src/projectActions.js',
-  'src/projectAssetsReader.js',
-  'src/projectFileEditor.js',
-  'src/projectPropertiesView.js',
-  'src/solutionTreeProvider.js',
-  'src/terminalRunner.js',
-  'src/workspaceScanner.js',
+  'dist/extension.js',
+  'dist/launchSettingsEditor.js',
+  'dist/projectActions.js',
+  'dist/projectAssetsReader.js',
+  'dist/projectFileEditor.js',
+  'dist/projectPropertiesView.js',
+  'dist/nugetManagerView.js',
+  'dist/nugetProtocolHost.js',
+  'dist/solutionActions.js',
+  'dist/solutionFileEditor.js',
+  'dist/solutionTreeProvider.js',
+  'dist/terminalRunner.js',
+  'dist/workspaceScanner.js',
   'scripts/validate.js'
 ];
 
@@ -22,6 +26,26 @@ main().catch((error) => {
 });
 
 async function main() {
+  execFileSync('npx', ['tsc', '-p', path.join(process.cwd(), 'tsconfig.json')], {
+    stdio: 'inherit'
+  });
+  execFileSync('dotnet', [
+    'publish',
+    path.join(process.cwd(), 'src/protocol-host/CanNugetGallery.ProtocolHost.csproj'),
+    '-c',
+    'Release',
+    '-o',
+    path.join(process.cwd(), 'dist/protocol-host'),
+    '--nologo'
+  ], {
+    stdio: 'inherit'
+  });
+
+  assert(
+    fs.existsSync(path.join(process.cwd(), 'dist/protocol-host/CanNugetGallery.ProtocolHost.dll')),
+    'NuGet protocol host was not published.'
+  );
+
   for (const file of files) {
     execFileSync(process.execPath, ['--check', path.join(process.cwd(), file)], {
       stdio: 'inherit'
@@ -36,13 +60,14 @@ async function main() {
   validateProjectPropertiesView();
   validateProjectActions();
   validateProjectPropertyEditor();
+  validateSolutionFileEditor();
 
   console.log(`Validated ${files.length} JavaScript files.`);
 }
 
 function validateManifest() {
   const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
-  const extensionSource = fs.readFileSync(path.join(process.cwd(), 'src/extension.js'), 'utf8');
+  const extensionSource = fs.readFileSync(path.join(process.cwd(), 'src/extension.ts'), 'utf8');
   const contributedCommands = new Set(packageJson.contributes.commands.map((command) => command.command));
   const registeredCommands = new Set([...extensionSource.matchAll(/registerCommand\('([^']+)'/g)].map((match) => match[1]));
   const missingRegistrations = [...contributedCommands].filter((command) => !registeredCommands.has(command));
@@ -62,6 +87,16 @@ function validateManifest() {
 
   const submenuIds = new Set((packageJson.contributes.submenus || []).map((submenu) => submenu.id));
   const menus = packageJson.contributes.menus || {};
+  const configurationProperties = packageJson.contributes.configuration?.properties || {};
+
+  assert(
+    configurationProperties['solutionManager.nuget.sources'],
+    'NuGet Manager sources setting is not contributed.'
+  );
+  assert(
+    configurationProperties['solutionManager.nuget.skipRestore'],
+    'NuGet Manager skip restore setting is not contributed.'
+  );
 
   for (const [location, entries] of Object.entries(menus)) {
     for (const entry of entries) {
@@ -76,6 +111,78 @@ function validateManifest() {
   }
 
   const viewItemMenus = menus['view/item/context'] || [];
+  assert(
+    hasMenuSubmenu(viewItemMenus, 'solutionManager.solution.add', 'solution'),
+    'Solution root does not expose Add submenu.'
+  );
+  assert(
+    hasMenuCommand(viewItemMenus, 'solutionManager.solutionManageNuGetPackages', 'solution'),
+    'Solution root does not expose Manage NuGet Packages.'
+  );
+  assert(
+    hasMenuCommand(viewItemMenus, 'solutionManager.solutionUnloadProjects', 'solution'),
+    'Solution root does not expose Unload Projects.'
+  );
+  assert(
+    hasMenuCommand(viewItemMenus, 'solutionManager.solutionLoadProjectsWithDependencies', 'solution'),
+    'Solution root does not expose Load Projects with Dependencies.'
+  );
+  assert(
+    hasMenuSubmenu(viewItemMenus, 'solutionManager.solution.ef', 'solution'),
+    'Solution root does not expose Entity Framework Core submenu.'
+  );
+  assert(
+    hasMenuCommand(viewItemMenus, 'solutionManager.solutionBuild', 'solution'),
+    'Solution root does not expose Build Solution.'
+  );
+  assert(
+    hasMenuCommand(viewItemMenus, 'solutionManager.solutionRunMultipleProjects', 'solution'),
+    'Solution root does not expose Run Multiple Projects.'
+  );
+  assert(
+    hasMenuCommand(viewItemMenus, 'solutionManager.solutionRunUnitTests', 'solution'),
+    'Solution root does not expose Run Unit Tests.'
+  );
+  assert(
+    hasMenuSubmenu(viewItemMenus, 'solutionManager.solution.advancedBuild', 'solution'),
+    'Solution root does not expose Advanced Build Actions submenu.'
+  );
+  assert(
+    hasMenuSubmenu(viewItemMenus, 'solutionManager.solution.git', 'solution'),
+    'Solution root does not expose Git submenu.'
+  );
+  assert(
+    hasMenuSubmenu(viewItemMenus, 'solutionManager.solution.copy', 'solution'),
+    'Solution root does not expose Copy Path/Reference submenu.'
+  );
+  assert(
+    hasMenuSubmenu(viewItemMenus, 'solutionManager.solution.openIn', 'solution'),
+    'Solution root does not expose Open In submenu.'
+  );
+  assert(
+    hasMenuCommand(viewItemMenus, 'solutionManager.solutionProperties', 'solution'),
+    'Solution root does not expose Properties.'
+  );
+  assert(
+    hasMenuCommand(menus['solutionManager.solution.add'] || [], 'solutionManager.solutionAddNewProject'),
+    'Solution Add submenu does not expose New Project.'
+  );
+  assert(
+    hasMenuCommand(menus['solutionManager.solution.add'] || [], 'solutionManager.solutionAddExistingProject'),
+    'Solution Add submenu does not expose Existing Project.'
+  );
+  assert(
+    !packageJson.contributes.commands.some((command) => [
+      'Show Local History',
+      'Refactor This...',
+      'Inspect Code...',
+      'Reformat and Cleanup...',
+      'Diagrams',
+      'Tools',
+      'Manage .NET SDK...'
+    ].includes(command.title)),
+    'Unsupported Rider-only solution actions should not be contributed.'
+  );
   assert(
     hasMenuCommand(viewItemMenus, 'solutionManager.dependencyGroupDetails', 'dependencyGroup.packages'),
     'Packages dependency group does not expose Dependency Details.'
@@ -139,11 +246,19 @@ function validateManifest() {
 }
 
 function hasMenuCommand(entries, command, contextValue) {
-  return entries.some((entry) => entry.command === command && String(entry.when || '').includes(`viewItem == ${contextValue}`));
+  return entries.some((entry) => entry.command === command && (!contextValue || String(entry.when || '').includes(`viewItem == ${contextValue}`)));
+}
+
+function hasMenuSubmenu(entries, submenu, contextValue) {
+  return entries.some((entry) => entry.submenu === submenu && (!contextValue || String(entry.when || '').includes(`viewItem == ${contextValue}`)));
+}
+
+function runtimeModulePath(fileName) {
+  return path.join(process.cwd(), 'dist', fileName);
 }
 
 function validateProjectAssetsParser() {
-  const { readProjectAssetsFromText } = require(path.join(process.cwd(), 'src/projectAssetsReader.js'));
+  const { readProjectAssetsFromText } = require(runtimeModulePath('projectAssetsReader.js'));
   const assets = {
     version: 3,
     targets: {
@@ -259,7 +374,7 @@ function validateDependencyPackagePathResolution() {
   process.env.NUGET_PACKAGES = cacheRoot;
 
   try {
-    const { __test } = require(path.join(process.cwd(), 'src/solutionTreeProvider.js'));
+    const { __test } = require(runtimeModulePath('solutionTreeProvider.js'));
     const packageFolder = path.join(cacheRoot, 'newtonsoft.json', '13.0.3');
     const assetPath = path.join(packageFolder, 'lib', 'netstandard2.0', 'Newtonsoft.Json.dll');
 
@@ -987,7 +1102,7 @@ function validateLaunchSettingsEditor() {
       removeLaunchProfileFromData,
       serializeEnvironmentVariables,
       updateLaunchSettingsData
-    } = require(path.join(process.cwd(), 'src/launchSettingsEditor.js'));
+    } = require(runtimeModulePath('launchSettingsEditor.js'));
     const launchSettings = readProjectLaunchSettingsFromText(JSON.stringify({
       profiles: {
         Kivi: {
@@ -1097,7 +1212,7 @@ async function validateProjectMetadataParser() {
   };
 
   try {
-    delete require.cache[require.resolve(path.join(process.cwd(), 'src/workspaceScanner.js'))];
+    delete require.cache[require.resolve(runtimeModulePath('workspaceScanner.js'))];
     const {
       enrichImportsWithImplicitDirectoryBuildFiles,
       enrichPackageReferencesWithCentralVersions,
@@ -1112,7 +1227,7 @@ async function validateProjectMetadataParser() {
       readPublishProfileFromText,
       readUserSecretsFromText,
       resolveUserSecretsPath
-    } = require(path.join(process.cwd(), 'src/workspaceScanner.js'));
+    } = require(runtimeModulePath('workspaceScanner.js'));
     const xml = [
       '<Project Sdk="Microsoft.NET.Sdk">',
       '<PropertyGroup>',
@@ -1582,7 +1697,7 @@ function validateProjectPropertiesView() {
   };
 
   try {
-    const { __test } = require(path.join(process.cwd(), 'src/projectPropertiesView.js'));
+    const { __test } = require(runtimeModulePath('projectPropertiesView.js'));
     const projectConfigurations = [
       {
         configuration: 'Staging',
@@ -2312,7 +2427,7 @@ function validateProjectActions() {
   };
 
   try {
-    const { __test } = require(path.join(process.cwd(), 'src/projectActions.js'));
+    const { __test } = require(runtimeModulePath('projectActions.js'));
     const metadata = {
       packageReferences: [
         {
@@ -2671,7 +2786,7 @@ function validateProjectPropertyEditor() {
       removeProjectConfigurationInText,
       updateProjectItemReferencesInText,
       updateProjectPropertiesInText
-    } = require(path.join(process.cwd(), 'src/projectFileEditor.js'));
+    } = require(runtimeModulePath('projectFileEditor.js'));
     const currentText = [
       '<Project Sdk="Microsoft.NET.Sdk">',
       '  <PropertyGroup>',
@@ -2881,6 +2996,104 @@ function validateProjectPropertyEditor() {
   } finally {
     Module._load = originalLoad;
   }
+}
+
+function validateSolutionFileEditor() {
+  const { __test } = require(runtimeModulePath('solutionFileEditor.js'));
+  const solutionPath = path.join('/repo', 'Kivi.sln');
+  const projectPath = path.join('/repo', 'src', 'App', 'App.csproj');
+  const clientGuid = '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}';
+  const coreGuid = '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}';
+  const projectGuid = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}';
+  const slnText = [
+    'Microsoft Visual Studio Solution File, Format Version 12.00',
+    `Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Clients", "Clients", "${clientGuid}"`,
+    'EndProject',
+    'Global',
+    '\tGlobalSection(SolutionConfigurationPlatforms) = preSolution',
+    '\t\tDebug|Any CPU = Debug|Any CPU',
+    '\tEndGlobalSection',
+    '\tGlobalSection(ProjectConfigurationPlatforms) = postSolution',
+    '\tEndGlobalSection',
+    '\tGlobalSection(NestedProjects) = preSolution',
+    '\tEndGlobalSection',
+    'EndGlobal',
+    ''
+  ].join('\n');
+  const slnProjectResult = __test.addProjectToSolutionText(slnText, solutionPath, projectPath, {
+    solutionFolder: 'Clients/Core',
+    createGuid: createGuidSequence([coreGuid, projectGuid])
+  });
+
+  assert(slnProjectResult.changed, 'Adding a project to .sln should report a change.');
+  assert(
+    slnProjectResult.text.includes(`Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "App", "src\\App\\App.csproj", "${projectGuid}"`),
+    '.sln project block was not inserted.'
+  );
+  assert(
+    slnProjectResult.text.includes(`${projectGuid}.Debug|Any CPU.ActiveCfg = Debug|Any CPU`),
+    '.sln project configuration was not inserted.'
+  );
+  assert(
+    slnProjectResult.text.includes(`${projectGuid} = ${coreGuid}`),
+    '.sln project was not nested under the selected solution folder.'
+  );
+  assert(
+    slnProjectResult.text.includes(`${coreGuid} = ${clientGuid}`),
+    '.sln solution folder nesting was not inserted.'
+  );
+
+  const duplicateSlnProject = __test.addProjectToSolutionText(slnProjectResult.text, solutionPath, projectPath, {
+    solutionFolder: 'Clients/Core',
+    createGuid: createGuidSequence(['{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}'])
+  });
+
+  assert(!duplicateSlnProject.changed, 'Duplicate .sln project add should not rewrite the solution.');
+
+  const slnFolderResult = __test.addSolutionFolderToSolutionText(slnText, solutionPath, 'Shared/Infrastructure', {
+    createGuid: createGuidSequence([
+      '{11111111-1111-1111-1111-111111111111}',
+      '{22222222-2222-2222-2222-222222222222}'
+    ])
+  });
+
+  assert(slnFolderResult.text.includes('= "Shared", "Shared"'), '.sln solution folder was not inserted.');
+  assert(slnFolderResult.text.includes('= "Infrastructure", "Infrastructure"'), '.sln nested solution folder was not inserted.');
+  assert(
+    slnFolderResult.text.includes('{22222222-2222-2222-2222-222222222222} = {11111111-1111-1111-1111-111111111111}'),
+    '.sln nested solution folder mapping was not inserted.'
+  );
+
+  const slnxPath = path.join('/repo', 'Kivi.slnx');
+  const slnxText = [
+    '<Solution>',
+    '  <Folder Name="Clients">',
+    '  </Folder>',
+    '</Solution>',
+    ''
+  ].join('\n');
+  const slnxProjectResult = __test.addProjectToSolutionText(slnxText, slnxPath, projectPath, {
+    solutionFolder: 'Clients/Core'
+  });
+
+  assert(slnxProjectResult.changed, 'Adding a project to .slnx should report a change.');
+  assert(slnxProjectResult.text.includes('<Project Path="src/App/App.csproj" />'), '.slnx project path was not inserted.');
+  assert(slnxProjectResult.text.includes('<Folder Name="Core">'), '.slnx solution folder was not inserted for the project.');
+
+  const slnxFolderResult = __test.addSolutionFolderToSolutionText('<Solution>\n</Solution>\n', slnxPath, 'Shared/Infrastructure');
+
+  assert(slnxFolderResult.text.includes('<Folder Name="Shared">'), '.slnx solution folder was not inserted.');
+  assert(slnxFolderResult.text.includes('<Folder Name="Infrastructure">'), '.slnx nested solution folder was not inserted.');
+
+  const duplicateSlnxFolder = __test.addSolutionFolderToSolutionText(slnxFolderResult.text, slnxPath, 'Shared/Infrastructure');
+
+  assert(!duplicateSlnxFolder.changed, 'Duplicate .slnx folder add should not rewrite the solution.');
+}
+
+function createGuidSequence(values) {
+  const queue = [...values];
+
+  return () => queue.shift();
 }
 
 function assert(condition, message) {

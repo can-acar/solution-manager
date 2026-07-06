@@ -1,5 +1,6 @@
-const path = require('path');
-const vscode = require('vscode');
+// @ts-nocheck
+import * as path from 'path';
+import * as vscode from 'vscode';
 
 function getLaunchSettingsPath(projectPath) {
   return path.join(path.dirname(projectPath), 'Properties', 'launchSettings.json');
@@ -292,7 +293,7 @@ function stringValue(value) {
   return value === undefined || value === null ? '' : String(value);
 }
 
-module.exports = {
+export {
   addLaunchProfileToData,
   addProjectLaunchProfile,
   duplicateLaunchProfileInData,

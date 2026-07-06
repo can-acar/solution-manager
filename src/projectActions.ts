@@ -1,26 +1,28 @@
-const os = require('os');
-const path = require('path');
-const vscode = require('vscode');
-const { quoteForShell } = require('./terminalRunner');
-const {
+// @ts-nocheck
+import * as os from 'os';
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { quoteForShell } from '#src/terminalRunner';
+import {
   addProjectLaunchProfile,
   duplicateProjectLaunchProfile,
   ensureLaunchSettingsFile,
   readProjectLaunchSettings,
   removeProjectLaunchProfile,
   updateProjectLaunchSettings
-} = require('./launchSettingsEditor');
-const {
+} from '#src/launchSettingsEditor';
+import {
   removeProjectConfiguration,
   updateProjectItemReferences,
   updateProjectProperties
-} = require('./projectFileEditor');
-const { showProjectProperties } = require('./projectPropertiesView');
-const {
+} from '#src/projectFileEditor';
+import { showProjectProperties } from '#src/projectPropertiesView';
+import { NuGetManagerView } from '#src/nugetManagerView';
+import {
   PACKAGE_ASSET_GROUPS,
   readProjectAssetsFromText
-} = require('./projectAssetsReader');
-const {
+} from '#src/projectAssetsReader';
+import {
   enrichImportsWithImplicitDirectoryBuildFiles,
   enrichPackageReferencesWithCentralVersions,
   enrichPackagesWithPackageSourceMappings,
@@ -32,7 +34,7 @@ const {
   readProjectMetadataFromText,
   readPublishProfiles,
   readUserSecrets
-} = require('./workspaceScanner');
+} from '#src/workspaceScanner';
 
 const PROJECT_PROPERTY_BROWSE_CONFIG = {
   ApplicationIcon: {
@@ -150,6 +152,7 @@ class ProjectActions {
     this.terminalRunner = terminalRunner;
     this.refresh = refresh;
     this.getState = getState;
+    this.nugetManagerView = new NuGetManagerView(context, terminalRunner, getState, refresh);
   }
 
   async addNewCSharpClass(node) {
@@ -399,33 +402,7 @@ class ProjectActions {
   }
 
   async manageNuGetPackages(node) {
-    const action = await vscode.window.showQuickPick(
-      [
-        { label: 'Add Package', action: 'add' },
-        { label: 'Remove Package', action: 'remove' },
-        { label: 'List Packages', action: 'list' }
-      ],
-      {
-        title: 'Manage NuGet Packages'
-      }
-    );
-
-    if (!action) {
-      return;
-    }
-
-    if (action.action === 'add') {
-      await this.addNuGetPackage(node);
-      return;
-    }
-
-    if (action.action === 'remove') {
-      await this.removeNuGetPackage(node);
-      return;
-    }
-
-    const project = getProjectItem(node);
-    this.terminalRunner.runCommand(`dotnet list ${quoteForShell(project.path)} package`);
+    await this.nugetManagerView.show(node);
   }
 
   async addNuGetPackage(node) {
@@ -3258,23 +3235,25 @@ function resolvePublishProfilePath(projectPath, value) {
   return resolvedPath;
 }
 
-module.exports = {
+const __test = {
+  createAssemblyMetadataXml,
+  createBuildSettingsXml,
+  createBuildEventsXml,
+  createDiagnosticPropertyXml,
+  createCentralPackageVersionXml,
+  createImportXml,
+  createNuGetPackageSourceMappingXml,
+  createPackageMetadataXml,
+  createPublishSettingsXml,
+  createProjectPropertiesReferenceXml,
+  createSigningXml,
+  createSourceGeneratorXml,
+  createPackageReferenceMetadata,
+  createPackageReferenceXml,
+  getProjectPackageInfo
+};
+
+export {
   ProjectActions,
-  __test: {
-    createAssemblyMetadataXml,
-    createBuildSettingsXml,
-    createBuildEventsXml,
-    createDiagnosticPropertyXml,
-    createCentralPackageVersionXml,
-    createImportXml,
-    createNuGetPackageSourceMappingXml,
-    createPackageMetadataXml,
-    createPublishSettingsXml,
-    createProjectPropertiesReferenceXml,
-    createSigningXml,
-    createSourceGeneratorXml,
-    createPackageReferenceMetadata,
-    createPackageReferenceXml,
-    getProjectPackageInfo
-  }
+  __test
 };

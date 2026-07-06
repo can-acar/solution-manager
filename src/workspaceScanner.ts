@@ -1,7 +1,8 @@
-const os = require('os');
-const path = require('path');
-const vscode = require('vscode');
-const { readProjectAssetsFromText } = require('./projectAssetsReader');
+// @ts-nocheck
+import * as os from 'os';
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { readProjectAssetsFromText } from '#src/projectAssetsReader';
 
 const CUSTOM_ITEMS_KEY = 'solutionManager.customItems';
 const EXCLUDE_PATTERN = '**/{node_modules,.git,.vs,bin,obj,out,dist,coverage}/**';
@@ -38,6 +39,7 @@ class WorkspaceScanner {
         const item = createItem(uri, 'solution');
         const solutionChildren = await this.getSolutionChildren(uri, projectByPath);
         item.children = solutionChildren.children;
+        item.solutionFolders = solutionChildren.solutionFolders;
         item.unloadedCount = solutionChildren.unloadedCount;
         return item;
       })
@@ -103,6 +105,7 @@ class WorkspaceScanner {
           if (kind === 'solution') {
             const solutionChildren = await this.getSolutionChildren(uri, new Map());
             item.children = solutionChildren.children;
+            item.solutionFolders = solutionChildren.solutionFolders;
             item.unloadedCount = solutionChildren.unloadedCount;
           } else {
             item.metadata = await readProjectMetadata(uri);
@@ -121,7 +124,8 @@ class WorkspaceScanner {
   }
 
   async getSolutionChildren(solutionUri, projectByPath) {
-    const references = await readSolutionProjectReferences(solutionUri);
+    const contents = await readSolutionContents(solutionUri);
+    const references = contents.references;
     const children = [];
     let unloadedCount = 0;
 
@@ -148,6 +152,7 @@ class WorkspaceScanner {
 
     return {
       children: sortItems(children),
+      solutionFolders: contents.folders,
       unloadedCount
     };
   }
@@ -1670,27 +1675,43 @@ function shouldSkipContentName(name) {
 }
 
 async function readSolutionProjectReferences(solutionUri) {
+  const contents = await readSolutionContents(solutionUri);
+  return contents.references;
+}
+
+async function readSolutionContents(solutionUri) {
   try {
     const buffer = await vscode.workspace.fs.readFile(solutionUri);
     const text = Buffer.from(buffer).toString('utf8');
-    return readSolutionProjectReferencesFromText(text, solutionUri.fsPath);
+    return readSolutionContentsFromText(text, solutionUri.fsPath);
   } catch {
-    return [];
+    return {
+      references: [],
+      folders: []
+    };
   }
 }
 
 function readSolutionProjectReferencesFromText(text, solutionPath) {
+  return readSolutionContentsFromText(text, solutionPath).references;
+}
+
+function readSolutionContentsFromText(text, solutionPath) {
   const solutionDir = path.dirname(solutionPath);
   const extension = path.extname(solutionPath).toLowerCase();
 
   if (extension === '.sln') {
-    return readSlnProjectReferences(text, solutionDir);
+    return readSlnContents(text, solutionDir);
   }
 
-  return readSlnxProjectReferences(text, solutionDir);
+  return readSlnxContents(text, solutionDir);
 }
 
 function readSlnProjectReferences(text, solutionDir) {
+  return readSlnContents(text, solutionDir).references;
+}
+
+function readSlnContents(text, solutionDir) {
   const foldersByGuid = new Map();
   const projectsByGuid = new Map();
   const parentByGuid = new Map();
@@ -1728,14 +1749,26 @@ function readSlnProjectReferences(text, solutionDir) {
     }
   }
 
-  return [...projectsByGuid.entries()].map(([guid, project]) => ({
-    ...project,
-    solutionFolders: getSolutionFolderPath(guid, foldersByGuid, parentByGuid)
-  }));
+  return {
+    references: [...projectsByGuid.entries()].map(([guid, project]) => ({
+      ...project,
+      solutionFolders: getSolutionFolderPath(guid, foldersByGuid, parentByGuid)
+    })),
+    folders: [...foldersByGuid.keys()]
+      .map((guid) => ({
+        path: getSolutionFolderPathIncludingSelf(guid, foldersByGuid, parentByGuid)
+      }))
+      .filter((folder) => folder.path.length > 0)
+  };
 }
 
 function readSlnxProjectReferences(text, solutionDir) {
+  return readSlnxContents(text, solutionDir).references;
+}
+
+function readSlnxContents(text, solutionDir) {
   const references = [];
+  const folders = [];
   const lines = text.split(/\r?\n/);
   const folderStack = [];
 
@@ -1743,6 +1776,9 @@ function readSlnxProjectReferences(text, solutionDir) {
     const folderOpen = line.match(/<Folder\b[^>]*(?:Name|name)=["']([^"']+)["'][^>]*>/);
     if (folderOpen) {
       folderStack.push(parseSlnxFolderName(folderOpen[1]));
+      folders.push({
+        path: folderStack.flat()
+      });
     }
 
     const projectMatch = line.match(/<(?:Project|project)\b[^>]*(?:Path|path)=["']([^"']+\.(?:csproj|fsproj|vbproj|proj))["']/);
@@ -1753,12 +1789,20 @@ function readSlnxProjectReferences(text, solutionDir) {
       });
     }
 
+    if (/\/>\s*$/.test(line) && folderOpen && folderStack.length > 0) {
+      folderStack.pop();
+      continue;
+    }
+
     if (/<\/Folder>/i.test(line) && folderStack.length > 0) {
       folderStack.pop();
     }
   }
 
-  return uniqueReferences(references);
+  return {
+    references: uniqueReferences(references),
+    folders: uniqueFolderPaths(folders)
+  };
 }
 
 function parseSlnxFolderName(value) {
@@ -1785,6 +1829,38 @@ function getSolutionFolderPath(guid, foldersByGuid, parentByGuid) {
   }
 
   return parts;
+}
+
+function getSolutionFolderPathIncludingSelf(guid, foldersByGuid, parentByGuid) {
+  const parts = getSolutionFolderPath(guid, foldersByGuid, parentByGuid);
+  const folderName = foldersByGuid.get(guid);
+
+  if (folderName) {
+    parts.push(folderName);
+  }
+
+  return parts;
+}
+
+function uniqueFolderPaths(folders) {
+  const result = [];
+  const seen = new Set();
+
+  for (const folder of folders) {
+    const pathParts = Array.isArray(folder.path) ? folder.path.filter(Boolean) : [];
+    const key = pathParts.join('/').toLowerCase();
+
+    if (!key || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push({
+      path: pathParts
+    });
+  }
+
+  return result;
 }
 
 function uniqueReferences(references) {
@@ -1848,7 +1924,7 @@ function normalizePath(value) {
   return process.platform === 'linux' ? resolved : resolved.toLowerCase();
 }
 
-module.exports = {
+export {
   WorkspaceScanner,
   enrichPackageReferencesWithCentralVersions,
   enrichPackagesWithPackageSourceMappings,
@@ -1866,6 +1942,7 @@ module.exports = {
   readPublishProfileFromText,
   readPublishProfiles,
   readProjectMetadataFromText,
+  readSolutionContentsFromText,
   readSolutionProjectReferencesFromText,
   readUserSecrets,
   readUserSecretsFromText,

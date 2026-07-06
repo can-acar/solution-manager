@@ -1,7 +1,10 @@
-const vscode = require('vscode');
-const { SolutionTreeProvider } = require('./solutionTreeProvider');
+import { execFile } from 'child_process';
+import * as vscode from 'vscode';
+import { SolutionTreeProvider } from '#src/solutionTreeProvider';
 
 function activate(context) {
+  updateAspireTemplateContext();
+
   const provider = new SolutionTreeProvider(context);
   const treeView = vscode.window.createTreeView(SolutionTreeProvider.viewType, {
     treeDataProvider: provider,
@@ -77,13 +80,56 @@ function activate(context) {
     vscode.commands.registerCommand('solutionManager.dependencyFrameworkDetails', (node) => provider.runDependencyFrameworkAction('frameworkDetails', node)),
     vscode.commands.registerCommand('solutionManager.dependencyBuildFramework', (node) => provider.runDependencyFrameworkAction('build', node)),
     vscode.commands.registerCommand('solutionManager.dependencyTestFramework', (node) => provider.runDependencyFrameworkAction('test', node)),
-    vscode.commands.registerCommand('solutionManager.dependencyCopyFramework', (node) => provider.runDependencyFrameworkAction('copyFramework', node))
+    vscode.commands.registerCommand('solutionManager.dependencyCopyFramework', (node) => provider.runDependencyFrameworkAction('copyFramework', node)),
+    vscode.commands.registerCommand('solutionManager.solutionAddNewProject', (node) => provider.runSolutionAction('addNewProject', node)),
+    vscode.commands.registerCommand('solutionManager.solutionAddSolutionFolder', (node) => provider.runSolutionAction('addSolutionFolder', node)),
+    vscode.commands.registerCommand('solutionManager.solutionAddDockerComposeFile', (node) => provider.runSolutionAction('addDockerComposeFile', node)),
+    vscode.commands.registerCommand('solutionManager.solutionAddAspireOrchestration', (node) => provider.runSolutionAction('addAspireOrchestration', node)),
+    vscode.commands.registerCommand('solutionManager.solutionAddExistingProject', (node) => provider.runSolutionAction('addExistingProject', node)),
+    vscode.commands.registerCommand('solutionManager.solutionAddExistingFolder', (node) => provider.runSolutionAction('addExistingFolder', node)),
+    vscode.commands.registerCommand('solutionManager.solutionManageNuGetPackages', (node) => provider.runSolutionAction('manageNuGetPackages', node)),
+    vscode.commands.registerCommand('solutionManager.solutionUnloadProjects', (node) => provider.runSolutionAction('unloadProjects', node)),
+    vscode.commands.registerCommand('solutionManager.solutionLoadProjects', (node) => provider.runSolutionAction('loadProjects', node)),
+    vscode.commands.registerCommand('solutionManager.solutionLoadProjectsWithDependencies', (node) => provider.runSolutionAction('loadProjectsWithDependencies', node)),
+    vscode.commands.registerCommand('solutionManager.solutionReloadAllProjects', (node) => provider.runSolutionAction('reloadAllProjects', node)),
+    vscode.commands.registerCommand('solutionManager.solutionSaveAs', (node) => provider.runSolutionAction('saveAs', node)),
+    vscode.commands.registerCommand('solutionManager.solutionEfAddMigration', (node) => provider.runSolutionAction('efAddMigration', node)),
+    vscode.commands.registerCommand('solutionManager.solutionEfRemoveMigration', (node) => provider.runSolutionAction('efRemoveMigration', node)),
+    vscode.commands.registerCommand('solutionManager.solutionEfUpdateDatabase', (node) => provider.runSolutionAction('efUpdateDatabase', node)),
+    vscode.commands.registerCommand('solutionManager.solutionEfScriptMigration', (node) => provider.runSolutionAction('efScriptMigration', node)),
+    vscode.commands.registerCommand('solutionManager.solutionBuild', (node) => provider.runSolutionAction('buildSolution', node)),
+    vscode.commands.registerCommand('solutionManager.solutionRunMultipleProjects', (node) => provider.runSolutionAction('runMultipleProjects', node)),
+    vscode.commands.registerCommand('solutionManager.solutionRunUnitTests', (node) => provider.runSolutionAction('runUnitTests', node)),
+    vscode.commands.registerCommand('solutionManager.solutionPublish', (node) => provider.runSolutionAction('publish', node)),
+    vscode.commands.registerCommand('solutionManager.solutionRestore', (node) => provider.runSolutionAction('restore', node)),
+    vscode.commands.registerCommand('solutionManager.solutionClean', (node) => provider.runSolutionAction('clean', node)),
+    vscode.commands.registerCommand('solutionManager.solutionRebuild', (node) => provider.runSolutionAction('rebuild', node)),
+    vscode.commands.registerCommand('solutionManager.solutionPack', (node) => provider.runSolutionAction('pack', node)),
+    vscode.commands.registerCommand('solutionManager.solutionGitStatus', (node) => provider.runSolutionAction('gitStatus', node)),
+    vscode.commands.registerCommand('solutionManager.solutionGitDiff', (node) => provider.runSolutionAction('gitDiff', node)),
+    vscode.commands.registerCommand('solutionManager.solutionGitLog', (node) => provider.runSolutionAction('gitLog', node)),
+    vscode.commands.registerCommand('solutionManager.solutionEditFile', (node) => provider.runSolutionAction('editSolutionFile', node)),
+    vscode.commands.registerCommand('solutionManager.solutionCopyFullPath', (node) => provider.runSolutionAction('copyFullPath', node)),
+    vscode.commands.registerCommand('solutionManager.solutionCopyRelativePath', (node) => provider.runSolutionAction('copyRelativePath', node)),
+    vscode.commands.registerCommand('solutionManager.solutionCopyName', (node) => provider.runSolutionAction('copySolutionName', node)),
+    vscode.commands.registerCommand('solutionManager.solutionOpenInEditor', (node) => provider.runSolutionAction('openInEditor', node)),
+    vscode.commands.registerCommand('solutionManager.solutionOpenInExplorer', (node) => provider.runSolutionAction('openInExplorer', node)),
+    vscode.commands.registerCommand('solutionManager.solutionOpenInTerminal', (node) => provider.runSolutionAction('openInTerminal', node)),
+    vscode.commands.registerCommand('solutionManager.solutionProperties', (node) => provider.runSolutionAction('showProperties', node))
   );
 }
 
 function deactivate() {}
 
-module.exports = {
+function updateAspireTemplateContext() {
+  vscode.commands.executeCommand('setContext', 'solutionManager.hasAspireTemplate', false);
+  execFile('dotnet', ['new', 'list', 'aspire'], { timeout: 5000 }, (error, stdout) => {
+    const hasAspireTemplate = !error && /aspire/i.test(stdout || '');
+    vscode.commands.executeCommand('setContext', 'solutionManager.hasAspireTemplate', hasAspireTemplate);
+  });
+}
+
+export {
   activate,
   deactivate
 };

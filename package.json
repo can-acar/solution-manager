@@ -79,9 +79,47 @@
     "onCommand:solutionManager.dependencyFrameworkDetails",
     "onCommand:solutionManager.dependencyBuildFramework",
     "onCommand:solutionManager.dependencyTestFramework",
-    "onCommand:solutionManager.dependencyCopyFramework"
+    "onCommand:solutionManager.dependencyCopyFramework",
+    "onCommand:solutionManager.solutionAddNewProject",
+    "onCommand:solutionManager.solutionAddSolutionFolder",
+    "onCommand:solutionManager.solutionAddDockerComposeFile",
+    "onCommand:solutionManager.solutionAddAspireOrchestration",
+    "onCommand:solutionManager.solutionAddExistingProject",
+    "onCommand:solutionManager.solutionAddExistingFolder",
+    "onCommand:solutionManager.solutionManageNuGetPackages",
+    "onCommand:solutionManager.solutionUnloadProjects",
+    "onCommand:solutionManager.solutionLoadProjects",
+    "onCommand:solutionManager.solutionLoadProjectsWithDependencies",
+    "onCommand:solutionManager.solutionReloadAllProjects",
+    "onCommand:solutionManager.solutionSaveAs",
+    "onCommand:solutionManager.solutionEfAddMigration",
+    "onCommand:solutionManager.solutionEfRemoveMigration",
+    "onCommand:solutionManager.solutionEfUpdateDatabase",
+    "onCommand:solutionManager.solutionEfScriptMigration",
+    "onCommand:solutionManager.solutionBuild",
+    "onCommand:solutionManager.solutionRunMultipleProjects",
+    "onCommand:solutionManager.solutionRunUnitTests",
+    "onCommand:solutionManager.solutionPublish",
+    "onCommand:solutionManager.solutionRestore",
+    "onCommand:solutionManager.solutionClean",
+    "onCommand:solutionManager.solutionRebuild",
+    "onCommand:solutionManager.solutionPack",
+    "onCommand:solutionManager.solutionGitStatus",
+    "onCommand:solutionManager.solutionGitDiff",
+    "onCommand:solutionManager.solutionGitLog",
+    "onCommand:solutionManager.solutionEditFile",
+    "onCommand:solutionManager.solutionCopyFullPath",
+    "onCommand:solutionManager.solutionCopyRelativePath",
+    "onCommand:solutionManager.solutionCopyName",
+    "onCommand:solutionManager.solutionOpenInEditor",
+    "onCommand:solutionManager.solutionOpenInExplorer",
+    "onCommand:solutionManager.solutionOpenInTerminal",
+    "onCommand:solutionManager.solutionProperties"
   ],
-  "main": "./src/extension.js",
+  "main": "./dist/extension.js",
+  "imports": {
+    "#src/*": "./dist/*.js"
+  },
   "extensionKind": [
     "workspace"
   ],
@@ -103,10 +141,59 @@
         }
       ]
     },
+    "configuration": {
+      "title": "Solution Manager",
+      "properties": {
+        "solutionManager.nuget.skipRestore": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip package restore when installing or updating NuGet packages from Solution Manager."
+        },
+        "solutionManager.nuget.sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "default": [
+            "{\"name\":\"nuget.org\",\"url\":\"https://api.nuget.org/v3/index.json\"}"
+          ],
+          "description": "Editable NuGet package sources used by Solution Manager. Each item is a JSON object with name and url."
+        }
+      }
+    },
     "submenus": [
       {
         "id": "solutionManager.project.add",
         "label": "Add"
+      },
+      {
+        "id": "solutionManager.solution.add",
+        "label": "Add"
+      },
+      {
+        "id": "solutionManager.solution.ef",
+        "label": "Entity Framework Core"
+      },
+      {
+        "id": "solutionManager.solution.advancedBuild",
+        "label": "Advanced Build Actions"
+      },
+      {
+        "id": "solutionManager.solution.git",
+        "label": "Git"
+      },
+      {
+        "id": "solutionManager.solution.edit",
+        "label": "Edit"
+      },
+      {
+        "id": "solutionManager.solution.copy",
+        "label": "Copy Path/Reference..."
+      },
+      {
+        "id": "solutionManager.solution.openIn",
+        "label": "Open In"
       },
       {
         "id": "solutionManager.project.ef",
@@ -533,6 +620,216 @@
         "title": "Copy Target Framework",
         "category": "Solution Manager",
         "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.solutionAddNewProject",
+        "title": "New Project...",
+        "category": "Solution Manager",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "solutionManager.solutionAddSolutionFolder",
+        "title": "New Solution Folder...",
+        "category": "Solution Manager",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "solutionManager.solutionAddDockerComposeFile",
+        "title": "Docker Compose File...",
+        "category": "Solution Manager",
+        "icon": "$(symbol-file)"
+      },
+      {
+        "command": "solutionManager.solutionAddAspireOrchestration",
+        "title": "Aspire Orchestration...",
+        "category": "Solution Manager",
+        "icon": "$(triangle-up)"
+      },
+      {
+        "command": "solutionManager.solutionAddExistingProject",
+        "title": "Existing Project...",
+        "category": "Solution Manager",
+        "icon": "$(references)"
+      },
+      {
+        "command": "solutionManager.solutionAddExistingFolder",
+        "title": "Existing Folder...",
+        "category": "Solution Manager",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "solutionManager.solutionManageNuGetPackages",
+        "title": "Manage NuGet Packages",
+        "category": "Solution Manager",
+        "icon": "$(package)"
+      },
+      {
+        "command": "solutionManager.solutionUnloadProjects",
+        "title": "Unload Projects",
+        "category": "Solution Manager",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "solutionManager.solutionLoadProjects",
+        "title": "Load Projects",
+        "category": "Solution Manager",
+        "icon": "$(debug-continue)"
+      },
+      {
+        "command": "solutionManager.solutionLoadProjectsWithDependencies",
+        "title": "Load Projects with Dependencies",
+        "category": "Solution Manager",
+        "icon": "$(references)"
+      },
+      {
+        "command": "solutionManager.solutionReloadAllProjects",
+        "title": "Reload All Projects",
+        "category": "Solution Manager",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "solutionManager.solutionSaveAs",
+        "title": "Save as...",
+        "category": "Solution Manager",
+        "icon": "$(save-as)"
+      },
+      {
+        "command": "solutionManager.solutionEfAddMigration",
+        "title": "Add Migration...",
+        "category": "Solution Manager",
+        "icon": "$(database)"
+      },
+      {
+        "command": "solutionManager.solutionEfRemoveMigration",
+        "title": "Remove Last Migration",
+        "category": "Solution Manager",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "solutionManager.solutionEfUpdateDatabase",
+        "title": "Update Database",
+        "category": "Solution Manager",
+        "icon": "$(database)"
+      },
+      {
+        "command": "solutionManager.solutionEfScriptMigration",
+        "title": "Script Migration",
+        "category": "Solution Manager",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "solutionManager.solutionBuild",
+        "title": "Build Solution",
+        "category": "Solution Manager",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "solutionManager.solutionRunMultipleProjects",
+        "title": "Run Multiple Projects...",
+        "category": "Solution Manager",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "solutionManager.solutionRunUnitTests",
+        "title": "Run Unit Tests",
+        "category": "Solution Manager",
+        "icon": "$(run)"
+      },
+      {
+        "command": "solutionManager.solutionPublish",
+        "title": "Publish...",
+        "category": "Solution Manager",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "solutionManager.solutionRestore",
+        "title": "Restore",
+        "category": "Solution Manager",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "solutionManager.solutionClean",
+        "title": "Clean",
+        "category": "Solution Manager",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "solutionManager.solutionRebuild",
+        "title": "Rebuild",
+        "category": "Solution Manager",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "solutionManager.solutionPack",
+        "title": "Pack",
+        "category": "Solution Manager",
+        "icon": "$(package)"
+      },
+      {
+        "command": "solutionManager.solutionGitStatus",
+        "title": "Status for Solution",
+        "category": "Solution Manager",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "solutionManager.solutionGitDiff",
+        "title": "Diff for Solution",
+        "category": "Solution Manager",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "solutionManager.solutionGitLog",
+        "title": "Log for Solution",
+        "category": "Solution Manager",
+        "icon": "$(history)"
+      },
+      {
+        "command": "solutionManager.solutionEditFile",
+        "title": "Open Solution File",
+        "category": "Solution Manager",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "solutionManager.solutionCopyFullPath",
+        "title": "Copy Full Path",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.solutionCopyRelativePath",
+        "title": "Copy Relative Path",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.solutionCopyName",
+        "title": "Copy Solution Name",
+        "category": "Solution Manager",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "solutionManager.solutionOpenInEditor",
+        "title": "Editor",
+        "category": "Solution Manager",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "solutionManager.solutionOpenInExplorer",
+        "title": "Explorer/Finder",
+        "category": "Solution Manager",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "solutionManager.solutionOpenInTerminal",
+        "title": "Integrated Terminal",
+        "category": "Solution Manager",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "solutionManager.solutionProperties",
+        "title": "Properties...",
+        "category": "Solution Manager",
+        "icon": "$(settings-gear)"
       }
     ],
     "menus": {
@@ -549,6 +846,96 @@
         }
       ],
       "view/item/context": [
+        {
+          "submenu": "solutionManager.solution.add",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "1_add@1"
+        },
+        {
+          "command": "solutionManager.solutionManageNuGetPackages",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "1_add@2"
+        },
+        {
+          "command": "solutionManager.solutionUnloadProjects",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "1_add@3"
+        },
+        {
+          "command": "solutionManager.solutionLoadProjects",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "1_add@4"
+        },
+        {
+          "command": "solutionManager.solutionLoadProjectsWithDependencies",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "1_add@5"
+        },
+        {
+          "command": "solutionManager.solutionReloadAllProjects",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "1_add@6"
+        },
+        {
+          "command": "solutionManager.solutionSaveAs",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "1_add@7"
+        },
+        {
+          "submenu": "solutionManager.solution.ef",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "2_ef@1"
+        },
+        {
+          "command": "solutionManager.solutionBuild",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "3_build@1"
+        },
+        {
+          "command": "solutionManager.solutionRunMultipleProjects",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "3_build@2"
+        },
+        {
+          "command": "solutionManager.solutionRunUnitTests",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "3_build@3"
+        },
+        {
+          "command": "solutionManager.solutionPublish",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "3_build@4"
+        },
+        {
+          "submenu": "solutionManager.solution.advancedBuild",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "3_build@5"
+        },
+        {
+          "submenu": "solutionManager.solution.git",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "4_tools@1"
+        },
+        {
+          "submenu": "solutionManager.solution.edit",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "5_open@1"
+        },
+        {
+          "submenu": "solutionManager.solution.copy",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "5_open@2"
+        },
+        {
+          "submenu": "solutionManager.solution.openIn",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "5_open@3"
+        },
+        {
+          "command": "solutionManager.solutionProperties",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "6_properties@1"
+        },
         {
           "submenu": "solutionManager.project.add",
           "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded)",
@@ -778,6 +1165,117 @@
           "command": "solutionManager.dependencyListPackages",
           "when": "view == solutionManager.solutionView && (viewItem == dependencyGroup.packages || viewItem == dependencyGroup.transitivePackages)",
           "group": "7_dependency@4"
+        }
+      ],
+      "solutionManager.solution.add": [
+        {
+          "command": "solutionManager.solutionAddNewProject",
+          "group": "1_new@1"
+        },
+        {
+          "command": "solutionManager.solutionAddSolutionFolder",
+          "group": "1_new@2"
+        },
+        {
+          "command": "solutionManager.solutionAddDockerComposeFile",
+          "group": "1_new@3"
+        },
+        {
+          "command": "solutionManager.solutionAddAspireOrchestration",
+          "when": "solutionManager.hasAspireTemplate",
+          "group": "1_new@4"
+        },
+        {
+          "command": "solutionManager.solutionAddExistingProject",
+          "group": "2_existing@1"
+        },
+        {
+          "command": "solutionManager.solutionAddExistingFolder",
+          "group": "2_existing@2"
+        }
+      ],
+      "solutionManager.solution.ef": [
+        {
+          "command": "solutionManager.solutionEfAddMigration",
+          "group": "1_migrations@1"
+        },
+        {
+          "command": "solutionManager.solutionEfRemoveMigration",
+          "group": "1_migrations@2"
+        },
+        {
+          "command": "solutionManager.solutionEfUpdateDatabase",
+          "group": "2_database@1"
+        },
+        {
+          "command": "solutionManager.solutionEfScriptMigration",
+          "group": "2_database@2"
+        }
+      ],
+      "solutionManager.solution.advancedBuild": [
+        {
+          "command": "solutionManager.solutionRestore",
+          "group": "1_build@1"
+        },
+        {
+          "command": "solutionManager.solutionClean",
+          "group": "1_build@2"
+        },
+        {
+          "command": "solutionManager.solutionRebuild",
+          "group": "1_build@3"
+        },
+        {
+          "command": "solutionManager.solutionPack",
+          "group": "2_pack@1"
+        }
+      ],
+      "solutionManager.solution.git": [
+        {
+          "command": "solutionManager.solutionGitStatus",
+          "group": "1_git@1"
+        },
+        {
+          "command": "solutionManager.solutionGitDiff",
+          "group": "1_git@2"
+        },
+        {
+          "command": "solutionManager.solutionGitLog",
+          "group": "1_git@3"
+        }
+      ],
+      "solutionManager.solution.edit": [
+        {
+          "command": "solutionManager.solutionEditFile",
+          "group": "1_edit@1"
+        }
+      ],
+      "solutionManager.solution.copy": [
+        {
+          "command": "solutionManager.solutionCopyFullPath",
+          "group": "1_copy@1"
+        },
+        {
+          "command": "solutionManager.solutionCopyRelativePath",
+          "group": "1_copy@2"
+        },
+        {
+          "command": "solutionManager.solutionCopyName",
+          "group": "1_copy@3"
+        }
+      ],
+      "solutionManager.solution.openIn": [
+        {
+          "command": "solutionManager.solutionOpenInEditor",
+          "group": "1_open@1"
+        },
+        {
+          "command": "solutionManager.solutionOpenInExplorer",
+          "group": "1_open@2"
+        },
+        {
+          "command": "solutionManager.solutionOpenInTerminal",
+          "group": "1_open@3"
         }
       ],
       "solutionManager.project.add": [
@@ -1182,11 +1680,161 @@
         {
           "command": "solutionManager.dependencyCopyFramework",
           "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionAddNewProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionAddSolutionFolder",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionAddDockerComposeFile",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionAddAspireOrchestration",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionAddExistingProject",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionAddExistingFolder",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionManageNuGetPackages",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionUnloadProjects",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionLoadProjects",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionLoadProjectsWithDependencies",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionReloadAllProjects",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionSaveAs",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionEfAddMigration",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionEfRemoveMigration",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionEfUpdateDatabase",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionEfScriptMigration",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionBuild",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionRunMultipleProjects",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionRunUnitTests",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionPublish",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionRestore",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionClean",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionRebuild",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionPack",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionGitStatus",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionGitDiff",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionGitLog",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionEditFile",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionCopyFullPath",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionCopyRelativePath",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionCopyName",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionOpenInEditor",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionOpenInExplorer",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionOpenInTerminal",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionProperties",
+          "when": "false"
         }
       ]
     }
   },
   "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "npm run compile:ts && npm run compile:protocol-host",
+    "compile:ts": "tsc -p tsconfig.json",
+    "compile:protocol-host": "dotnet publish src/protocol-host/CanNugetGallery.ProtocolHost.csproj -c Release -o dist/protocol-host --nologo",
     "validate": "node scripts/validate.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.2.2",
+    "typescript": "^5.5.4"
   }
 }

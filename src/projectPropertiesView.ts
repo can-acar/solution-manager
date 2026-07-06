@@ -1,14 +1,15 @@
-const vscode = require('vscode');
-const {
+// @ts-nocheck
+import * as vscode from 'vscode';
+import {
   readProjectLaunchSettings,
   serializeEnvironmentVariables,
   updateProjectLaunchSettings
-} = require('./launchSettingsEditor');
-const {
+} from '#src/launchSettingsEditor';
+import {
   updateProjectItemReferences,
   updateProjectProperties
-} = require('./projectFileEditor');
-const { readProjectMetadataFromText } = require('./workspaceScanner');
+} from '#src/projectFileEditor';
+import { readProjectMetadataFromText } from '#src/workspaceScanner';
 
 const CONFIGURATION_EDITOR_PROPERTIES = [
   'OutputPath',
@@ -2351,10 +2352,12 @@ function getNonce() {
   return text;
 }
 
-module.exports = {
+const __test = {
+  getDisplayConfigurations,
+  getProjectPropertiesHtml
+};
+
+export {
   showProjectProperties,
-  __test: {
-    getDisplayConfigurations,
-    getProjectPropertiesHtml
-  }
+  __test
 };
