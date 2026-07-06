@@ -130,8 +130,11 @@ class NuGetManagerView {
                 return;
             }
             if (message.type === 'install' || message.type === 'update') {
-                const packageId = requireText(message.packageId, 'Package id is required.');
+                const packageId = (0, terminalRunner_1.assertValidPackageId)(requireText(message.packageId, 'Package id is required.'));
                 const version = String(message.version || '').trim();
+                if (version) {
+                    (0, terminalRunner_1.assertValidPackageVersion)(version);
+                }
                 const projects = this.getActionProjects(message.projectPath, packageId, message.type, message.projectPaths);
                 let updatedInProjectFiles = 0;
                 let commandCount = 0;
@@ -162,7 +165,7 @@ class NuGetManagerView {
                 return;
             }
             if (message.type === 'remove') {
-                const packageId = requireText(message.packageId, 'Package id is required.');
+                const packageId = (0, terminalRunner_1.assertValidPackageId)(requireText(message.packageId, 'Package id is required.'));
                 const projects = this.getActionProjects(message.projectPath, packageId, message.type);
                 if (projects.length === 0) {
                     throw new Error(`Package '${packageId}' is not installed in the selected scope.`);
@@ -171,6 +174,11 @@ class NuGetManagerView {
                     this.terminalRunner.runCommand(`dotnet remove ${(0, terminalRunner_1.quoteForShell)(project.path)} package ${(0, terminalRunner_1.quoteForShell)(packageId)}`);
                 }
                 await this.postNotice(message.requestId, `Remove command sent for ${projects.length} project${projects.length === 1 ? '' : 's'}.`);
+                return;
+            }
+            if (message.type === 'clearCache') {
+                this.terminalRunner.runCommand('dotnet nuget locals all --clear');
+                await this.postNotice(message.requestId, 'Clear cache command sent (dotnet nuget locals all --clear).');
                 return;
             }
             if (message.type === 'list') {
@@ -980,6 +988,7 @@ class NuGetManagerView {
           <input id="queryInput" placeholder="Search NuGet packages" />
         </div>
         <button id="refreshButton" class="icon-button" title="Refresh" aria-label="Refresh">↻</button>
+        <button id="clearCacheButton" class="icon-button" title="Clear NuGet caches (dotnet nuget locals all --clear)" aria-label="Clear NuGet cache">🗑</button>
         <select id="projectSelect" title="Project"></select>
         <select id="sourceSelect" title="Package source"></select>
         <label class="checkbox-row"><input id="prereleaseInput" type="checkbox" /> Prerelease</label>
@@ -1052,15 +1061,19 @@ class NuGetManagerView {
       activeMainTab: 'packages',
       activePackageTab: 'browse',
       lastBrowseRequestKey: '',
-      searchResults: []
+      searchResults: [],
+      latestRequest: { search: '', details: '' }
     };
     let nextRequestId = 1;
     const pending = new Map();
     let projectSelectionResolve;
     const $ = (id) => document.getElementById(id);
 
-    function request(type, payload = {}) {
+    function request(type, payload = {}, channel) {
       const requestId = String(nextRequestId++);
+      if (channel) {
+        state.latestRequest[channel] = requestId;
+      }
       vscode.postMessage({ type, requestId, ...payload });
       return new Promise((resolve) => pending.set(requestId, resolve));
     }
@@ -1077,11 +1090,11 @@ class NuGetManagerView {
         render();
         loadTopPackagesIfNeeded();
       }
-      if (message.packages) {
+      if (message.packages && message.requestId === state.latestRequest.search) {
         state.searchResults = message.packages;
         renderSearchResults();
       }
-      if (message.details) {
+      if (message.details && message.requestId === state.latestRequest.details) {
         state.selectedDetails = message.details;
         renderDetails();
       }
@@ -1098,6 +1111,11 @@ class NuGetManagerView {
       setStatus('Refreshing...');
       await request('refresh');
       setStatus('Refreshed');
+    });
+    $('clearCacheButton').addEventListener('click', async () => {
+      setStatus('Clearing cache...');
+      const response = await request('clearCache');
+      setStatus(response && response.error ? response.error : 'Clear cache command sent');
     });
     $('projectSelect').addEventListener('change', (event) => {
       state.selectedProjectPath = event.target.value;
@@ -1141,11 +1159,16 @@ class NuGetManagerView {
     async function loadBrowsePackages() {
       setPackageTab('browse');
       setStatus('Searching...');
-      await request('search', {
+      const response = await request('search', {
         query: $('queryInput').value,
         prerelease: $('prereleaseInput').checked,
         sourceUrl: $('sourceSelect').value
-      });
+      }, 'search');
+
+      if (response.requestId !== state.latestRequest.search || response.error) {
+        return;
+      }
+
       setStatus('Search complete');
     }
 
@@ -1494,7 +1517,7 @@ class NuGetManagerView {
         version,
         prerelease: $('prereleaseInput').checked,
         sourceUrl: sourceUrl || $('sourceSelect').value || (state.sources[0] && state.sources[0].url)
-      });
+      }, 'details');
     }
 
     function packageRow(pkg, installed) {

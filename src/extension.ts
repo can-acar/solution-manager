@@ -18,7 +18,7 @@ function activate(context) {
     treeView,
     vscode.commands.registerCommand('solutionManager.open', () => provider.focus()),
     vscode.commands.registerCommand('solutionManager.openSolutionFile', () => provider.openSolutionFile()),
-    vscode.commands.registerCommand('solutionManager.refresh', () => provider.refresh({ userVisible: true })),
+    vscode.commands.registerCommand('solutionManager.refresh', () => provider.refresh({ userVisible: true, force: true })),
     vscode.commands.registerCommand('solutionManager.scanWorkspace', () => provider.scanWorkspace()),
     vscode.commands.registerCommand('solutionManager.addProject', () => provider.addProject()),
     vscode.commands.registerCommand('solutionManager.build', () => provider.pickAndRun('build')),
@@ -59,6 +59,9 @@ function activate(context) {
     vscode.commands.registerCommand('solutionManager.openInExplorer', (node) => provider.runProjectAction('openInExplorer', node)),
     vscode.commands.registerCommand('solutionManager.openInTerminal', (node) => provider.runProjectAction('openInTerminal', node)),
     vscode.commands.registerCommand('solutionManager.showProperties', (node) => provider.runProjectAction('showProperties', node)),
+    vscode.commands.registerCommand('solutionManager.projectFindInFiles', (node) => provider.runProjectAction('findInFiles', node)),
+    vscode.commands.registerCommand('solutionManager.projectReplaceInFiles', (node) => provider.runProjectAction('replaceInFiles', node)),
+    vscode.commands.registerCommand('solutionManager.projectFindFile', (node) => provider.runProjectAction('findFile', node)),
     vscode.commands.registerCommand('solutionManager.dependencyPackageDetails', (node) => provider.runDependencyAction('packageDetails', node)),
     vscode.commands.registerCommand('solutionManager.dependencyOpenNuGet', (node) => provider.runDependencyAction('openNuGet', node)),
     vscode.commands.registerCommand('solutionManager.dependencyOpenPackageFolder', (node) => provider.runDependencyAction('openPackageFolder', node)),
@@ -116,7 +119,10 @@ function activate(context) {
     vscode.commands.registerCommand('solutionManager.solutionOpenInEditor', (node) => provider.runSolutionAction('openInEditor', node)),
     vscode.commands.registerCommand('solutionManager.solutionOpenInExplorer', (node) => provider.runSolutionAction('openInExplorer', node)),
     vscode.commands.registerCommand('solutionManager.solutionOpenInTerminal', (node) => provider.runSolutionAction('openInTerminal', node)),
-    vscode.commands.registerCommand('solutionManager.solutionProperties', (node) => provider.runSolutionAction('showProperties', node))
+    vscode.commands.registerCommand('solutionManager.solutionProperties', (node) => provider.runSolutionAction('showProperties', node)),
+    vscode.commands.registerCommand('solutionManager.solutionFindInFiles', (node) => provider.runSolutionAction('findInFiles', node)),
+    vscode.commands.registerCommand('solutionManager.solutionReplaceInFiles', (node) => provider.runSolutionAction('replaceInFiles', node)),
+    vscode.commands.registerCommand('solutionManager.solutionFindFile', (node) => provider.runSolutionAction('findFile', node))
   );
 }
 

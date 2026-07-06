@@ -614,7 +614,7 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
           </div>
           <div class="section">
             <div class="section-title">Language</div>
-            ${editableFieldRow('Language Version:', 'LangVersion', languageVersion === 'Default' ? '' : languageVersion)}
+            ${selectInputRow('Language Version:', 'LangVersion', metadata.langVersion || '', buildLanguageVersionOptions(metadata.langVersion || ''))}
             ${selectInputRow('Nullable reference types (C# 8.0+):', 'Nullable', metadata.nullable || '', ['', 'enable', 'disable', 'annotations', 'warnings'])}
             ${selectInputRow('Implicit usings:', 'ImplicitUsings', buildSettings.implicitUsings || '', ['', 'enable', 'disable'])}
           </div>
@@ -2138,6 +2138,14 @@ function formatNullable(value) {
         return 'Disable';
     }
     return value;
+}
+function buildLanguageVersionOptions(currentValue) {
+    const options = ['', 'default', 'latest', 'latestMajor', 'preview', '14.0', '13.0', '12.0', '11.0', '10.0', '9.0', '8.0', '7.3', '7.2', '7.1', '7', '6', 'ISO-2', 'ISO-1'];
+    const normalized = String(currentValue || '');
+    if (normalized && !options.includes(normalized)) {
+        options.splice(1, 0, normalized);
+    }
+    return options;
 }
 function inferLanguageVersion(targetFramework) {
     const match = /^net(\d+)\./i.exec(targetFramework || '');

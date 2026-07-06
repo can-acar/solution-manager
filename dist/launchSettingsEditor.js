@@ -72,14 +72,7 @@ async function updateProjectLaunchSettings(projectPath, profileUpdates = []) {
         return readProjectLaunchSettings(projectPath);
     }
     const launchPath = getLaunchSettingsPath(projectPath);
-    let current = {};
-    try {
-        const buffer = await vscode.workspace.fs.readFile(vscode.Uri.file(launchPath));
-        current = JSON.parse(Buffer.from(buffer).toString('utf8'));
-    }
-    catch {
-        current = {};
-    }
+    const current = await readLaunchSettingsData(launchPath);
     const next = updateLaunchSettingsData(current, profileUpdates);
     await writeLaunchSettings(launchPath, next);
     return normalizeLaunchSettings(next, launchPath, true);
@@ -236,12 +229,22 @@ async function writeLaunchSettings(launchPath, data) {
     await vscode.workspace.fs.writeFile(uri, Buffer.from(`${JSON.stringify(data, null, 2)}\n`, 'utf8'));
 }
 async function readLaunchSettingsData(launchPath) {
+    let buffer;
     try {
-        const buffer = await vscode.workspace.fs.readFile(vscode.Uri.file(launchPath));
-        return JSON.parse(Buffer.from(buffer).toString('utf8'));
+        buffer = await vscode.workspace.fs.readFile(vscode.Uri.file(launchPath));
     }
     catch {
         return {};
+    }
+    const text = Buffer.from(buffer).toString('utf8').replace(/^﻿/, '');
+    if (!text.trim()) {
+        return {};
+    }
+    try {
+        return JSON.parse(text);
+    }
+    catch {
+        throw new Error(`launchSettings.json is not valid JSON and was left unchanged: ${launchPath}`);
     }
 }
 function getUniqueProfileName(profiles, requestedName) {

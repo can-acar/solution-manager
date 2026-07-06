@@ -514,7 +514,7 @@ internal sealed class ProtocolHost
                 source[2..]);
         }
 
-        return Environment.ExpandEnvironmentVariables(source);
+        return source;
     }
 
     private static IEnumerable<string> SplitValues(string? value)
@@ -577,7 +577,7 @@ internal sealed record LocalPackageInfo(
     {
         return new PackageDto
         {
-            Id = Path,
+            Id = Id,
             Name = Id,
             Authors = Authors,
             Description = Description,

@@ -7,6 +7,7 @@ import {
   addSolutionFolderToSolutionFile,
   saveSolutionAs
 } from '#src/solutionFileEditor';
+import { openScopedFindInFiles, openScopedQuickOpen } from '#src/searchActions';
 
 const PROJECT_FILE_EXTENSIONS = new Set(['.csproj', '.fsproj', '.vbproj', '.proj']);
 const PROJECT_TEMPLATES = [
@@ -150,6 +151,15 @@ class SolutionActions {
           name: solution.name,
           cwd: vscode.Uri.file(path.dirname(solution.path))
         }).show();
+        break;
+      case 'findInFiles':
+        await openScopedFindInFiles(path.dirname(solution.path), false);
+        break;
+      case 'replaceInFiles':
+        await openScopedFindInFiles(path.dirname(solution.path), true);
+        break;
+      case 'findFile':
+        await openScopedQuickOpen(path.dirname(solution.path));
         break;
       case 'showProperties':
         await this.showProperties(solution);

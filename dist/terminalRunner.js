@@ -35,6 +35,9 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TerminalRunner = void 0;
 exports.quoteForShell = quoteForShell;
+exports.assertValidPackageId = assertValidPackageId;
+exports.assertValidPackageVersion = assertValidPackageVersion;
+exports.assertValidMigrationName = assertValidMigrationName;
 const vscode = __importStar(require("vscode"));
 class TerminalRunner {
     terminal;
@@ -66,7 +69,31 @@ class TerminalRunner {
 exports.TerminalRunner = TerminalRunner;
 function quoteForShell(value) {
     if (process.platform === 'win32') {
-        return `"${value.replace(/"/g, '\\"')}"`;
+        if (/[`"$%\r\n]/.test(value)) {
+            throw new Error('Value contains characters that cannot be safely used in a terminal command.');
+        }
+        return `"${value}"`;
     }
     return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+const NUGET_PACKAGE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const NUGET_PACKAGE_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9.\-+*\[\]() ,]*$/;
+const MIGRATION_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+function assertValidPackageId(value) {
+    if (!value || !NUGET_PACKAGE_ID_PATTERN.test(value)) {
+        throw new Error(`Invalid NuGet package id: ${value}`);
+    }
+    return value;
+}
+function assertValidPackageVersion(value) {
+    if (!value || !NUGET_PACKAGE_VERSION_PATTERN.test(value)) {
+        throw new Error(`Invalid NuGet package version: ${value}`);
+    }
+    return value;
+}
+function assertValidMigrationName(value) {
+    if (!value || !MIGRATION_NAME_PATTERN.test(value)) {
+        throw new Error(`Invalid migration name: ${value}`);
+    }
+    return value;
 }

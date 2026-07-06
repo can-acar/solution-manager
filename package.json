@@ -115,7 +115,13 @@
     "onCommand:solutionManager.solutionOpenInEditor",
     "onCommand:solutionManager.solutionOpenInExplorer",
     "onCommand:solutionManager.solutionOpenInTerminal",
-    "onCommand:solutionManager.solutionProperties"
+    "onCommand:solutionManager.solutionProperties",
+    "onCommand:solutionManager.solutionFindInFiles",
+    "onCommand:solutionManager.solutionReplaceInFiles",
+    "onCommand:solutionManager.solutionFindFile",
+    "onCommand:solutionManager.projectFindInFiles",
+    "onCommand:solutionManager.projectReplaceInFiles",
+    "onCommand:solutionManager.projectFindFile"
   ],
   "main": "./dist/extension.js",
   "imports": {
@@ -124,6 +130,12 @@
   "extensionKind": [
     "workspace"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Solution Manager runs dotnet, git, and Entity Framework commands using project and solution file paths, so it is disabled in untrusted workspaces."
+    }
+  },
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -206,6 +218,10 @@
         "label": "Open In"
       },
       {
+        "id": "solutionManager.solution.find",
+        "label": "Find"
+      },
+      {
         "id": "solutionManager.project.ef",
         "label": "Entity Framework Core"
       },
@@ -224,6 +240,10 @@
       {
         "id": "solutionManager.project.openIn",
         "label": "Open In"
+      },
+      {
+        "id": "solutionManager.project.find",
+        "label": "Find"
       },
       {
         "id": "solutionManager.dependency.copy",
@@ -840,6 +860,42 @@
         "title": "Properties...",
         "category": "Solution Manager",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "solutionManager.solutionFindInFiles",
+        "title": "Find in Solution...",
+        "category": "Solution Manager",
+        "icon": "$(search)"
+      },
+      {
+        "command": "solutionManager.solutionReplaceInFiles",
+        "title": "Replace in Solution...",
+        "category": "Solution Manager",
+        "icon": "$(replace-all)"
+      },
+      {
+        "command": "solutionManager.solutionFindFile",
+        "title": "Find File in Solution...",
+        "category": "Solution Manager",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "solutionManager.projectFindInFiles",
+        "title": "Find in Project...",
+        "category": "Solution Manager",
+        "icon": "$(search)"
+      },
+      {
+        "command": "solutionManager.projectReplaceInFiles",
+        "title": "Replace in Project...",
+        "category": "Solution Manager",
+        "icon": "$(replace-all)"
+      },
+      {
+        "command": "solutionManager.projectFindFile",
+        "title": "Find File in Project...",
+        "category": "Solution Manager",
+        "icon": "$(go-to-file)"
       }
     ],
     "menus": {
@@ -942,6 +998,11 @@
           "group": "5_open@3"
         },
         {
+          "submenu": "solutionManager.solution.find",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "5_open@4"
+        },
+        {
           "command": "solutionManager.solutionProperties",
           "when": "view == solutionManager.solutionView && viewItem == solution",
           "group": "6_properties@1"
@@ -1005,6 +1066,11 @@
           "submenu": "solutionManager.project.openIn",
           "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded || viewItem == projectUnloaded)",
           "group": "5_open@2"
+        },
+        {
+          "submenu": "solutionManager.project.find",
+          "when": "view == solutionManager.solutionView && (viewItem == projectLoaded || viewItem == projectTestLoaded || viewItem == projectUnloaded)",
+          "group": "5_open@3"
         },
         {
           "command": "solutionManager.showProperties",
@@ -1288,6 +1354,20 @@
           "group": "1_open@3"
         }
       ],
+      "solutionManager.solution.find": [
+        {
+          "command": "solutionManager.solutionFindInFiles",
+          "group": "1_find@1"
+        },
+        {
+          "command": "solutionManager.solutionReplaceInFiles",
+          "group": "1_find@2"
+        },
+        {
+          "command": "solutionManager.solutionFindFile",
+          "group": "1_find@3"
+        }
+      ],
       "solutionManager.project.add": [
         {
           "command": "solutionManager.addNewCSharpClass",
@@ -1400,6 +1480,20 @@
           "group": "1_open@3"
         }
       ],
+      "solutionManager.project.find": [
+        {
+          "command": "solutionManager.projectFindInFiles",
+          "group": "1_find@1"
+        },
+        {
+          "command": "solutionManager.projectReplaceInFiles",
+          "group": "1_find@2"
+        },
+        {
+          "command": "solutionManager.projectFindFile",
+          "group": "1_find@3"
+        }
+      ],
       "solutionManager.dependency.copy": [
         {
           "command": "solutionManager.dependencyCopyPackageId",
@@ -1465,6 +1559,30 @@
         },
         {
           "command": "solutionManager.testTreeItem",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionFindInFiles",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionReplaceInFiles",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionFindFile",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.projectFindInFiles",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.projectReplaceInFiles",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.projectFindFile",
           "when": "false"
         },
         {

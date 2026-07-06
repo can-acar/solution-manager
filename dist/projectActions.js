@@ -42,6 +42,7 @@ const terminalRunner_1 = require("#src/terminalRunner");
 const launchSettingsEditor_1 = require("#src/launchSettingsEditor");
 const projectFileEditor_1 = require("#src/projectFileEditor");
 const projectPropertiesView_1 = require("#src/projectPropertiesView");
+const searchActions_1 = require("#src/searchActions");
 const nugetManagerView_1 = require("#src/nugetManagerView");
 const projectAssetsReader_1 = require("#src/projectAssetsReader");
 const workspaceScanner_1 = require("#src/workspaceScanner");
@@ -367,7 +368,7 @@ class ProjectActions {
             title: 'Add NuGet Package',
             prompt: 'Package id',
             placeHolder: 'Microsoft.EntityFrameworkCore',
-            validateInput: (value) => value.trim() ? undefined : 'Package id is required.'
+            validateInput: (value) => validatePackageIdInput(value)
         });
         if (!packageName) {
             return;
@@ -375,10 +376,12 @@ class ProjectActions {
         const version = await vscode.window.showInputBox({
             title: 'Add NuGet Package',
             prompt: 'Optional version',
-            placeHolder: '8.0.0'
+            placeHolder: '8.0.0',
+            validateInput: (value) => validateOptionalPackageVersionInput(value)
         });
-        const versionArg = version && version.trim() ? ` --version ${(0, terminalRunner_1.quoteForShell)(version.trim())}` : '';
-        this.terminalRunner.runCommand(`dotnet add ${(0, terminalRunner_1.quoteForShell)(project.path)} package ${(0, terminalRunner_1.quoteForShell)(packageName.trim())}${versionArg}`);
+        const trimmedVersion = version && version.trim();
+        const versionArg = trimmedVersion ? ` --version ${(0, terminalRunner_1.quoteForShell)((0, terminalRunner_1.assertValidPackageVersion)(trimmedVersion))}` : '';
+        this.terminalRunner.runCommand(`dotnet add ${(0, terminalRunner_1.quoteForShell)(project.path)} package ${(0, terminalRunner_1.quoteForShell)((0, terminalRunner_1.assertValidPackageId)(packageName.trim()))}${versionArg}`);
     }
     async removeNuGetPackage(node) {
         const project = getProjectItem(node);
@@ -399,13 +402,13 @@ class ProjectActions {
             packageName = await vscode.window.showInputBox({
                 title: 'Remove NuGet Package',
                 prompt: 'Package id',
-                validateInput: (value) => value.trim() ? undefined : 'Package id is required.'
+                validateInput: (value) => validatePackageIdInput(value)
             });
         }
         if (!packageName) {
             return;
         }
-        this.terminalRunner.runCommand(`dotnet remove ${(0, terminalRunner_1.quoteForShell)(project.path)} package ${(0, terminalRunner_1.quoteForShell)(packageName.trim())}`);
+        this.terminalRunner.runCommand(`dotnet remove ${(0, terminalRunner_1.quoteForShell)(project.path)} package ${(0, terminalRunner_1.quoteForShell)((0, terminalRunner_1.assertValidPackageId)(packageName.trim()))}`);
     }
     async addPackageReference(node) {
         const project = getProjectItem(node);
@@ -467,12 +470,12 @@ class ProjectActions {
                 title: 'Add EF Core Migration',
                 prompt: 'Migration name',
                 placeHolder: 'AddCustomerTable',
-                validateInput: (value) => value.trim() ? undefined : 'Migration name is required.'
+                validateInput: (value) => validateMigrationNameInput(value)
             });
             if (!migrationName) {
                 return;
             }
-            this.terminalRunner.runCommand(`dotnet ef migrations add ${(0, terminalRunner_1.quoteForShell)(migrationName.trim())} --project ${(0, terminalRunner_1.quoteForShell)(project.path)}`);
+            this.terminalRunner.runCommand(`dotnet ef migrations add ${(0, terminalRunner_1.quoteForShell)((0, terminalRunner_1.assertValidMigrationName)(migrationName.trim()))} --project ${(0, terminalRunner_1.quoteForShell)(project.path)}`);
             return;
         }
         if (action === 'removeMigration') {
@@ -536,6 +539,15 @@ class ProjectActions {
             name: project.name,
             cwd: projectDirectoryUri
         }).show();
+    }
+    async search(kind, node) {
+        const project = getProjectItem(node);
+        const projectDirectory = path.dirname(project.path);
+        if (kind === 'findFile') {
+            await (0, searchActions_1.openScopedQuickOpen)(projectDirectory);
+            return;
+        }
+        await (0, searchActions_1.openScopedFindInFiles)(projectDirectory, kind === 'replaceInFiles');
     }
     async showProperties(node) {
         const project = getProjectItem(node);
@@ -1097,6 +1109,10 @@ class ProjectActions {
                 await vscode.env.clipboard.writeText(eventInfo.command);
                 return { message: `${eventInfo.label} copied.` };
             }
+            const confirmation = await vscode.window.showWarningMessage(`Run ${eventInfo.label}? The following command from the project file will be executed:\n\n${eventInfo.command}`, { modal: true }, 'Run');
+            if (confirmation !== 'Run') {
+                return { message: `${eventInfo.label} was not run.` };
+            }
             this.terminalRunner.runCommand(createProjectDirectoryCommand(project.path, eventInfo.command));
             return { message: `${eventInfo.label} sent to terminal.` };
         }
@@ -1619,6 +1635,33 @@ function validateConfigurationPart(value) {
         return 'Value is required.';
     }
     return /['"<>&|]/.test(text) ? 'Do not use quotes, XML markup, ampersands, or pipe characters.' : undefined;
+}
+function validatePackageIdInput(value) {
+    const text = String(value || '').trim();
+    if (!text) {
+        return 'Package id is required.';
+    }
+    return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(text)
+        ? undefined
+        : 'Package id may only contain letters, digits, and the . _ - characters.';
+}
+function validateOptionalPackageVersionInput(value) {
+    const text = String(value || '').trim();
+    if (!text) {
+        return undefined;
+    }
+    return /^[A-Za-z0-9][A-Za-z0-9.\-+*\[\]() ,]*$/.test(text)
+        ? undefined
+        : 'Version contains characters that are not allowed.';
+}
+function validateMigrationNameInput(value) {
+    const text = String(value || '').trim();
+    if (!text) {
+        return 'Migration name is required.';
+    }
+    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(text)
+        ? undefined
+        : 'Migration name may only contain letters, digits, and underscores, and cannot start with a digit.';
 }
 function createPropertyGroupXml(entries) {
     const properties = entries.filter(([, value]) => value !== undefined && value !== '');

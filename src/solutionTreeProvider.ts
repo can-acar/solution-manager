@@ -65,11 +65,11 @@ class SolutionTreeProvider {
 
   async scanWorkspace() {
     await this.focus().catch(() => undefined);
-    await this.refresh({ userVisible: true });
+    await this.refresh({ userVisible: true, force: true });
   }
 
   async refresh(options = {}) {
-    this.currentState = await this.scanner.scan();
+    this.currentState = await this.scanner.scan({ force: options.force });
     this.updateViewTitle(this.currentState);
     this.onDidChangeTreeDataEmitter.fire();
 
@@ -420,6 +420,15 @@ class SolutionTreeProvider {
         case 'openInTerminal':
           await this.projectActions.openIn('terminal', node);
           break;
+        case 'findInFiles':
+          await this.projectActions.search('findInFiles', node);
+          break;
+        case 'replaceInFiles':
+          await this.projectActions.search('replaceInFiles', node);
+          break;
+        case 'findFile':
+          await this.projectActions.search('findFile', node);
+          break;
         case 'showProperties':
           await this.projectActions.showProperties(node);
           break;
@@ -723,8 +732,19 @@ class SolutionTreeProvider {
       return;
     }
 
+    const failures = [];
+
     for (const projectNode of nodes) {
-      this.projectActions.runDotnetAction('build', projectNode);
+      try {
+        this.projectActions.runDotnetAction('build', projectNode);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        failures.push(`${projectNode.item?.name || 'project'}: ${message}`);
+      }
+    }
+
+    if (failures.length > 0) {
+      vscode.window.showErrorMessage(`Solution Manager: ${failures.join('; ')}`);
     }
   }
 
@@ -997,7 +1017,7 @@ function getDependencyPackageInfo(node) {
   return {
     name,
     include: reference.include || name,
-    version: reference.version || node.description,
+    version: reference.version || reference.requested || reference.resolved,
     requested: reference.requested,
     resolved: reference.resolved,
     direct: reference.direct,
@@ -1930,13 +1950,103 @@ function getDependencyFrameworkChildren(project, framework) {
   const frameworkReferences = getFrameworkDependencyReferences(metadata, resolved, framework);
 
   return [
-    createDependencyGroup(project, framework, 'assemblies', 'Assemblies', metadata.assemblyReferences || []),
+    createAssembliesGroup(project, framework, metadata, resolved),
     createDependencyGroup(project, framework, 'projects', 'Projects', projectReferences),
     createDependencyGroup(project, framework, 'analyzers', 'Analyzers', metadata.analyzerReferences || []),
     ...packageGroups,
     createDependencyGroup(project, framework, 'frameworks', 'Frameworks', frameworkReferences),
     createDependencyGroup(project, framework, 'sourceGenerators', 'Source Generators', metadata.sourceGenerators || [])
   ];
+}
+
+function createAssembliesGroup(project, framework, metadata, resolved) {
+  const explicit = metadata.assemblyReferences || [];
+  const children = explicit.map((reference) => createDependencyItem(
+    project,
+    'assemblies',
+    getReferenceLabel(reference),
+    getReferenceDescription(reference, 'assemblies'),
+    reference
+  ));
+
+  const implicitAssemblies = getImplicitAssemblies(metadata, resolved, framework);
+
+  if (implicitAssemblies.length > 0) {
+    children.push({
+      id: `dependency-group:${project.uri}:${framework}:assembliesImplicit`,
+      kind: 'dependencyGroup',
+      groupKind: 'assembliesImplicit',
+      framework,
+      label: 'Implicit',
+      description: `${implicitAssemblies.length}`,
+      item: project,
+      children: implicitAssemblies.map((entry) => createDependencyItem(
+        project,
+        'assembly',
+        entry.name,
+        entry.description,
+        entry.reference
+      )),
+      collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+      contextValue: 'dependencyGroup.assembliesImplicit'
+    });
+  }
+
+  return {
+    id: `dependency-group:${project.uri}:${framework}:assemblies`,
+    kind: 'dependencyGroup',
+    groupKind: 'assemblies',
+    framework,
+    label: 'Assemblies',
+    description: children.length ? `${children.length}` : undefined,
+    item: project,
+    children,
+    collapsibleState: children.length
+      ? vscode.TreeItemCollapsibleState.Collapsed
+      : vscode.TreeItemCollapsibleState.None,
+    contextValue: 'dependencyGroup.assemblies'
+  };
+}
+
+function getImplicitAssemblies(metadata, resolved, framework) {
+  const packages = getFrameworkPackages(metadata, resolved, framework);
+  const seen = new Set();
+  const assemblies = [];
+
+  for (const packageReference of packages) {
+    const compileGroup = getPackageAssetGroups(packageReference).find((group) => group.key === 'compile');
+    const assets = compileGroup ? compileGroup.assets : [];
+
+    for (const asset of assets) {
+      if (!/\.dll$/i.test(asset)) {
+        continue;
+      }
+
+      const name = path.basename(asset, path.extname(asset));
+      const dedupeKey = name.toLowerCase();
+
+      if (seen.has(dedupeKey)) {
+        continue;
+      }
+
+      seen.add(dedupeKey);
+      assemblies.push({
+        name,
+        description: '',
+        reference: {
+          name,
+          kind: 'assembly',
+          assetPath: asset,
+          packageName: packageReference.name,
+          packageVersion: packageReference.version,
+          packageReference,
+          path: getPackageAssetPath(packageReference, asset)
+        }
+      });
+    }
+  }
+
+  return assemblies.sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }));
 }
 
 function getProjectDependencyReferences(metadata, resolved, framework) {
@@ -2471,6 +2581,7 @@ function getDependencyItemIcon(groupKind) {
     case 'projects':
       return new vscode.ThemeIcon('project');
     case 'assemblies':
+    case 'assembly':
     case 'frameworks':
       return new vscode.ThemeIcon('library');
     case 'analyzers':

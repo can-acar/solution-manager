@@ -39,6 +39,7 @@ const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 const terminalRunner_1 = require("#src/terminalRunner");
 const solutionFileEditor_1 = require("#src/solutionFileEditor");
+const searchActions_1 = require("#src/searchActions");
 const PROJECT_FILE_EXTENSIONS = new Set(['.csproj', '.fsproj', '.vbproj', '.proj']);
 const PROJECT_TEMPLATES = [
     {
@@ -178,6 +179,15 @@ class SolutionActions {
                     name: solution.name,
                     cwd: vscode.Uri.file(path.dirname(solution.path))
                 }).show();
+                break;
+            case 'findInFiles':
+                await (0, searchActions_1.openScopedFindInFiles)(path.dirname(solution.path), false);
+                break;
+            case 'replaceInFiles':
+                await (0, searchActions_1.openScopedFindInFiles)(path.dirname(solution.path), true);
+                break;
+            case 'findFile':
+                await (0, searchActions_1.openScopedQuickOpen)(path.dirname(solution.path));
                 break;
             case 'showProperties':
                 await this.showProperties(solution);

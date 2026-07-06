@@ -13,9 +13,71 @@ const SOLUTION_EXTENSIONS = new Set(['.sln', '.slnx']);
 class WorkspaceScanner {
   constructor(context) {
     this.context = context;
+    this.projectCache = new Map();
+    this.sharedDirty = false;
+    this.registerInvalidationWatchers();
   }
 
-  async scan() {
+  registerInvalidationWatchers() {
+    const markSharedDirty = () => {
+      this.sharedDirty = true;
+    };
+    const sharedWatcher = vscode.workspace.createFileSystemWatcher(
+      '**/{Directory.Build.props,Directory.Build.targets,Directory.Packages.props,nuget.config,NuGet.Config,NuGet.config,global.json,packages.lock.json,project.assets.json}'
+    );
+    sharedWatcher.onDidCreate(markSharedDirty);
+    sharedWatcher.onDidChange(markSharedDirty);
+    sharedWatcher.onDidDelete(markSharedDirty);
+
+    const projectWatcher = vscode.workspace.createFileSystemWatcher('**/*.{csproj,fsproj,vbproj,proj}');
+    const dropProject = (uri) => this.projectCache.delete(normalizePath(uri.fsPath));
+    projectWatcher.onDidChange(dropProject);
+    projectWatcher.onDidCreate(dropProject);
+    projectWatcher.onDidDelete(dropProject);
+
+    const folderListener = vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      this.projectCache.clear();
+      this.sharedDirty = true;
+    });
+
+    if (this.context && Array.isArray(this.context.subscriptions)) {
+      this.context.subscriptions.push(sharedWatcher, projectWatcher, folderListener);
+    }
+  }
+
+  async getCachedProjectData(uri) {
+    const key = normalizePath(uri.fsPath);
+    let mtime = 0;
+
+    try {
+      mtime = (await vscode.workspace.fs.stat(uri)).mtime;
+    } catch {
+      mtime = 0;
+    }
+
+    const cached = this.projectCache.get(key);
+
+    if (cached && cached.mtime === mtime) {
+      return cached;
+    }
+
+    const metadata = await readProjectMetadata(uri);
+    const entry = {
+      mtime,
+      metadata,
+      isTestProject: metadata.isTestProject,
+      contents: await readProjectContents(uri)
+    };
+    this.projectCache.set(key, entry);
+    return entry;
+  }
+
+  async scan(options = {}) {
+    if (options.force || this.sharedDirty) {
+      this.projectCache.clear();
+      this.sharedDirty = false;
+    }
+
     const workspaceFolders = vscode.workspace.workspaceFolders || [];
     const solutionUris = workspaceFolders.length
       ? await vscode.workspace.findFiles('**/*.{sln,slnx}', EXCLUDE_PATTERN, 200)
@@ -27,9 +89,10 @@ class WorkspaceScanner {
     const projectItems = sortItems(await Promise.all(
       projectUris.map(async (uri) => {
         const item = createItem(uri, 'project');
-        item.metadata = await readProjectMetadata(uri);
-        item.isTestProject = item.metadata.isTestProject;
-        item.contents = await readProjectContents(uri);
+        const cached = await this.getCachedProjectData(uri);
+        item.metadata = cached.metadata;
+        item.isTestProject = cached.isTestProject;
+        item.contents = cached.contents;
         return item;
       })
     ));
@@ -697,8 +760,50 @@ function isPackageSourcePatternMatch(pattern, packageName) {
     return false;
   }
 
-  const expression = new RegExp(`^${escapeRegExp(text).replace(/\\\*/g, '.*')}$`, 'i');
-  return expression.test(String(packageName || ''));
+  return matchWildcardPattern(text.toLowerCase(), String(packageName || '').toLowerCase());
+}
+
+function matchWildcardPattern(pattern, value) {
+  const segments = pattern.split('*');
+
+  if (segments.length === 1) {
+    return value === pattern;
+  }
+
+  let index = 0;
+  const first = segments[0];
+
+  if (first) {
+    if (!value.startsWith(first)) {
+      return false;
+    }
+
+    index = first.length;
+  }
+
+  for (let position = 1; position < segments.length - 1; position += 1) {
+    const segment = segments[position];
+
+    if (!segment) {
+      continue;
+    }
+
+    const found = value.indexOf(segment, index);
+
+    if (found === -1) {
+      return false;
+    }
+
+    index = found + segment.length;
+  }
+
+  const last = segments[segments.length - 1];
+
+  if (last) {
+    return value.length - index >= last.length && value.endsWith(last);
+  }
+
+  return true;
 }
 
 function escapeRegExp(value) {
