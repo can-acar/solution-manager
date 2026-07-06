@@ -54,6 +54,7 @@ async function main() {
 
   validateManifest();
   validateProjectAssetsParser();
+  validateNuGetManagerView();
   validateDependencyPackagePathResolution();
   validateLaunchSettingsEditor();
   await validateProjectMetadataParser();
@@ -356,6 +357,103 @@ function validateProjectAssetsParser() {
   assert(net10.packages[0].packageAssetGroups.length >= 8, 'Package asset groups were not created.');
   assert(net10.projects.length === 1, 'Project assets project references were not read.');
   assert(net10.frameworkReferences.length === 1, 'Framework references were not read from assets.');
+}
+
+function validateNuGetManagerView() {
+  const originalLoad = Module._load;
+  const vscodeMock = {
+    FileType: {
+      File: 1
+    },
+    Uri: {
+      file: (fsPath) => ({ fsPath })
+    },
+    workspace: {
+      getConfiguration: () => ({
+        get: (key) => {
+          if (key === 'sources') {
+            return ['{"name":"nuget.org","url":"https://api.nuget.org/v3/index.json"}'];
+          }
+
+          if (key === 'skipRestore') {
+            return false;
+          }
+
+          return undefined;
+        },
+        update: async () => {}
+      }),
+      getWorkspaceFolder: () => undefined,
+      workspaceFolders: [],
+      fs: {
+        readFile: async () => Buffer.from(''),
+        stat: async () => ({ type: 1 })
+      }
+    },
+    window: {
+      showWarningMessage: () => {},
+      showErrorMessage: () => {},
+      setStatusBarMessage: () => {}
+    }
+  };
+
+  Module._load = function loadWithVscodeMock(request, parent, isMain) {
+    if (request === 'vscode') {
+      return vscodeMock;
+    }
+
+    return originalLoad.call(this, request, parent, isMain);
+  };
+
+  try {
+    const { __test } = require(runtimeModulePath('nugetManagerView.js'));
+    const packageInfo = __test.mapProtocolPackage({
+      Id: 'Newtonsoft.Json',
+      Name: 'Newtonsoft.Json',
+      Authors: ['James Newton-King'],
+      Description: 'Json.NET',
+      TotalDownloads: 10,
+      Version: '13.0.4',
+      Versions: [{ Version: '13.0.4', Id: '13.0.4' }],
+      Tags: ['json']
+    }, 'https://api.nuget.org/v3/index.json');
+
+    assert(packageInfo.id === 'Newtonsoft.Json', 'NuGet protocol package ID was not mapped.');
+    assert(packageInfo.authors === 'James Newton-King', 'NuGet protocol package authors were not mapped.');
+    assert(packageInfo.versions[0].version === '13.0.4', 'NuGet protocol package versions were not mapped.');
+
+    const groups = __test.mapProtocolDependencyGroups({
+      Dependencies: {
+        Frameworks: {
+          'net8.0': [{ Package: 'System.Text.Json', VersionRange: '[8.0.0, )' }]
+        }
+      }
+    });
+
+    assert(groups[0].targetFramework === 'net8.0', 'NuGet dependency framework was not mapped.');
+    assert(groups[0].dependencies[0].id === 'System.Text.Json', 'NuGet dependency package was not mapped.');
+
+    const sources = __test.getPackageSources([
+      {
+        name: 'App',
+        path: '/repo/App.csproj',
+        metadata: {
+          nugetConfig: {
+            packageSources: [
+              { key: 'private', value: 'https://example.test/v3/index.json' }
+            ]
+          }
+        }
+      }
+    ], [
+      { name: 'global', url: 'file:///Users/test/.nuget/packages', editable: false, origin: 'nuget-config' }
+    ]);
+
+    assert(sources.some((source) => source.name === 'private'), 'Project NuGet.config source was not included.');
+    assert(sources.some((source) => source.name === 'global'), 'Protocol host NuGet source was not included.');
+  } finally {
+    Module._load = originalLoad;
+  }
 }
 
 function validateDependencyPackagePathResolution() {

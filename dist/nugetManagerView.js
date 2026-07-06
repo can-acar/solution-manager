@@ -33,9 +33,15 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NuGetManagerView = void 0;
+exports.__test = exports.NuGetManagerView = void 0;
+exports.mapProtocolDependencyGroups = mapProtocolDependencyGroups;
+exports.mapProtocolPackage = mapProtocolPackage;
+exports.getPackageSources = getPackageSources;
+exports.canUpdatePackageReference = canUpdatePackageReference;
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
+const projectFileEditor_1 = require("#src/projectFileEditor");
+const nugetProtocolHost_1 = require("#src/nugetProtocolHost");
 const terminalRunner_1 = require("#src/terminalRunner");
 const NUGET_ORG_SOURCE = {
     key: 'nuget.org',
@@ -49,11 +55,13 @@ class NuGetManagerView {
     refresh;
     panel;
     projects = [];
+    protocolHost;
     constructor(context, terminalRunner, getState, refresh) {
         this.context = context;
         this.terminalRunner = terminalRunner;
         this.getState = getState;
         this.refresh = refresh;
+        this.protocolHost = new nugetProtocolHost_1.NuGetProtocolHost(context.extensionPath);
     }
     async show(node) {
         const state = await this.getState();
@@ -87,8 +95,7 @@ class NuGetManagerView {
                 return;
             }
             if (message.type === 'search') {
-                const sourceUrl = message.sourceUrl || NUGET_ORG_SOURCE.value;
-                const results = await searchNuGetPackages(sourceUrl, message.query || '', Boolean(message.prerelease));
+                const results = await this.searchPackages(message.sourceUrl, message.query || '', Boolean(message.prerelease));
                 await this.postResponse(message.requestId, {
                     packages: results
                 });
@@ -97,7 +104,7 @@ class NuGetManagerView {
             if (message.type === 'details') {
                 const sourceUrl = message.sourceUrl || NUGET_ORG_SOURCE.value;
                 const packageId = requireText(message.packageId, 'Package id is required.');
-                const details = await getNuGetPackageDetails(sourceUrl, packageId, message.version);
+                const details = await this.getPackageDetails(sourceUrl, packageId, message.version, Boolean(message.prerelease));
                 await this.postResponse(message.requestId, {
                     details
                 });
@@ -120,6 +127,15 @@ class NuGetManagerView {
                 const project = this.requireProject(message.projectPath);
                 const packageId = requireText(message.packageId, 'Package id is required.');
                 const version = String(message.version || '').trim();
+                const updatedInProjectFiles = await this.tryApplyProjectFilePackageUpdate(project, packageId, version);
+                if (updatedInProjectFiles) {
+                    await this.refresh({ userVisible: false });
+                    const state = await this.getState();
+                    this.projects = mergeFreshProjectMetadata(this.projects, state);
+                    await this.postState(message.requestId);
+                    await this.postNotice(message.requestId, `${message.type === 'update' ? 'Updated' : 'Installed'} ${packageId} in project files.`);
+                    return;
+                }
                 const versionArg = version ? ` --version ${(0, terminalRunner_1.quoteForShell)(version)}` : '';
                 const sourceArg = message.sourceUrl ? ` --source ${(0, terminalRunner_1.quoteForShell)(normalizeSourceForDotnet(message.sourceUrl))}` : '';
                 const restoreArg = getSkipRestore() ? ' --no-restore' : '';
@@ -151,7 +167,7 @@ class NuGetManagerView {
     async postState(requestId) {
         await this.postResponse(requestId, {
             projects: this.projects.map(toWebProject),
-            sources: getPackageSources(this.projects)
+            sources: await this.getPackageSources()
         });
     }
     async postNotice(requestId, message) {
@@ -451,7 +467,7 @@ class NuGetManagerView {
       $('projectSelect').innerHTML = state.projects.map((project) =>
         '<option value="' + escapeAttribute(project.path) + '"' + (project.path === state.selectedProjectPath ? ' selected' : '') + '>' + escapeHtml(project.name) + '</option>'
       ).join('');
-      $('sourceSelect').innerHTML = state.sources.map((source) =>
+      $('sourceSelect').innerHTML = '<option value="">All sources</option>' + state.sources.map((source) =>
         '<option value="' + escapeAttribute(source.url) + '">' + escapeHtml(source.name) + '</option>'
       ).join('');
       renderInstalled();
@@ -463,8 +479,21 @@ class NuGetManagerView {
       const project = selectedProject();
       const packages = project ? project.packages : [];
       $('installedList').innerHTML = packages.length ? packages.map((pkg) => packageRow(pkg, true)).join('') : '<div class="empty">No PackageReference items found.</div>';
-      document.querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', () => runPackageAction('remove', button.dataset.remove)));
-      document.querySelectorAll('[data-list]').forEach((button) => button.addEventListener('click', () => request('list', { projectPath: state.selectedProjectPath })));
+      document.querySelectorAll('#installedList [data-select-package]').forEach((row) => row.addEventListener('click', () => {
+        const pkg = packages.find((item) => (item.id || item.name) === row.dataset.selectPackage);
+        state.selectedPackage = pkg;
+        state.selectedDetails = undefined;
+        renderDetails();
+        loadDetails(pkg.id || pkg.name, pkg.version || pkg.centralVersion);
+      }));
+      document.querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        runPackageAction('remove', button.dataset.remove);
+      }));
+      document.querySelectorAll('[data-list]').forEach((button) => button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        request('list', { projectPath: state.selectedProjectPath });
+      }));
     }
 
     function renderSources() {
@@ -486,12 +515,12 @@ class NuGetManagerView {
         state.selectedPackage = pkg;
         state.selectedDetails = undefined;
         renderDetails();
-        loadDetails(pkg.id, pkg.version);
+        loadDetails(pkg.id, pkg.version, pkg.sourceUrl);
       }));
       document.querySelectorAll('[data-install]').forEach((button) => button.addEventListener('click', (event) => {
         event.stopPropagation();
         const pkg = state.searchResults.find((item) => item.id === button.dataset.install);
-        runPackageAction(isInstalled(pkg.id) ? 'update' : 'install', pkg.id, pkg.version);
+        runPackageAction(isInstalled(pkg.id) ? 'update' : 'install', pkg.id, pkg.version, pkg.sourceUrl);
       }));
       renderDetails();
     }
@@ -517,8 +546,8 @@ class NuGetManagerView {
         '<div class="actions" style="justify-content:flex-start;padding:0 8px 8px"><button id="installSelectedButton">' + (isInstalled(pkg.id) ? 'Update' : 'Install') + '</button></div>' +
         '<div class="section-title">Dependencies</div>' +
         dependencyHtml;
-      $('details').querySelector('#installSelectedButton').addEventListener('click', () => runPackageAction(isInstalled(pkg.id) ? 'update' : 'install', pkg.id, $('versionSelect').value));
-      $('details').querySelector('#versionSelect').addEventListener('change', (event) => loadDetails(pkg.id, event.target.value));
+      $('details').querySelector('#installSelectedButton').addEventListener('click', () => runPackageAction(isInstalled(pkg.id) ? 'update' : 'install', pkg.id, $('versionSelect').value, pkg.sourceUrl));
+      $('details').querySelector('#versionSelect').addEventListener('change', (event) => loadDetails(pkg.id, event.target.value, pkg.sourceUrl));
     }
 
     function renderDependencies(groups) {
@@ -532,12 +561,13 @@ class NuGetManagerView {
       ).join('') + '</div>';
     }
 
-    async function loadDetails(packageId, version) {
+    async function loadDetails(packageId, version, sourceUrl) {
       if (!packageId) return;
       await request('details', {
         packageId,
         version,
-        sourceUrl: $('sourceSelect').value
+        prerelease: $('prereleaseInput').checked,
+        sourceUrl: sourceUrl || $('sourceSelect').value || (state.sources[0] && state.sources[0].url)
       });
     }
 
@@ -551,14 +581,14 @@ class NuGetManagerView {
       return '<div class="row" data-select-package="' + escapeAttribute(id) + '"><div><div class="title">' + escapeHtml(id) + '</div><div class="meta">' + installedMeta + '</div><div class="desc">' + escapeHtml(pkg.description || '') + '</div></div><div class="actions">' + action + '</div></div>';
     }
 
-    async function runPackageAction(type, packageId, version) {
+    async function runPackageAction(type, packageId, version, sourceUrl) {
       if (!state.selectedProjectPath) return;
       setStatus(type + ' ' + packageId + '...');
       await request(type, {
         projectPath: state.selectedProjectPath,
         packageId,
         version,
-        sourceUrl: $('sourceSelect').value
+        sourceUrl: sourceUrl || $('sourceSelect').value
       });
     }
 
@@ -621,6 +651,113 @@ class NuGetManagerView {
 </body>
 </html>`;
     }
+    async getPackageSources() {
+        return getPackageSources(this.projects, await this.listProtocolSources());
+    }
+    async listProtocolSources() {
+        try {
+            return (await this.protocolHost.listSources()).map((source) => ({
+                name: String(source.Name || source.name || source.Url || source.url || ''),
+                url: String(source.Url || source.url || ''),
+                editable: false,
+                origin: String(source.Origin || source.origin || 'nuget.config')
+            })).filter((source) => source.name && source.url);
+        }
+        catch (error) {
+            vscode.window.showWarningMessage(`Solution Manager: NuGet sources could not be loaded from nuget.config: ${getErrorMessage(error)}`);
+            return [];
+        }
+    }
+    async searchPackages(sourceUrl, query, prerelease) {
+        const sources = sourceUrl
+            ? [{ url: sourceUrl }]
+            : (await this.getPackageSources()).map((source) => ({ url: source.url }));
+        const results = await Promise.allSettled(sources.map(async (source) => {
+            const packages = await this.protocolHost.search(source.url, query, prerelease, 0, 50);
+            return packages.map((item) => mapProtocolPackage(item, source.url));
+        }));
+        const merged = new Map();
+        const failures = [];
+        for (const result of results) {
+            if (result.status === 'rejected') {
+                failures.push(getErrorMessage(result.reason));
+                continue;
+            }
+            for (const item of result.value) {
+                const key = String(item.id || item.name || '').toLowerCase();
+                if (key && !merged.has(key)) {
+                    merged.set(key, item);
+                }
+            }
+        }
+        if (merged.size === 0 && failures.length > 0) {
+            throw new Error(failures[0]);
+        }
+        return [...merged.values()];
+    }
+    async getPackageDetails(sourceUrl, packageId, version, prerelease) {
+        const packageInfo = mapProtocolPackage(await this.protocolHost.getPackage(sourceUrl, packageId, prerelease), sourceUrl);
+        const selectedVersion = version && packageInfo.versions?.some((item) => item.version === version)
+            ? version
+            : packageInfo.version;
+        const details = await this.protocolHost.getPackageDetails(sourceUrl, packageId, selectedVersion);
+        const dependencyGroups = mapProtocolDependencyGroups(details);
+        return {
+            id: packageInfo.id,
+            version: selectedVersion,
+            description: packageInfo.description,
+            authors: packageInfo.authors,
+            licenseUrl: packageInfo.licenseUrl,
+            projectUrl: packageInfo.projectUrl,
+            tags: packageInfo.tags,
+            versions: packageInfo.versions || [],
+            dependencyGroups
+        };
+    }
+    async tryApplyProjectFilePackageUpdate(project, packageId, version) {
+        if (!version) {
+            return false;
+        }
+        const existingReference = findPackageReference(project, packageId);
+        if (isCentralPackageReference(existingReference)) {
+            const centralReference = existingReference?.centralPackageVersion || findCentralPackageVersion(project, packageId);
+            if (!centralReference?.path) {
+                return false;
+            }
+            if (hasReferenceCondition(centralReference) || hasReferenceCondition(existingReference)) {
+                throw new Error(`Package '${packageId}' uses a conditional central package version. Edit Directory.Packages.props manually.`);
+            }
+            await (0, projectFileEditor_1.updateProjectItemReferences)(centralReference.path, [{
+                    action: 'add',
+                    elementName: 'PackageVersion',
+                    include: centralReference.include || centralReference.name || packageId,
+                    identityAttribute: centralReference.identityAttribute || 'Include',
+                    groupCondition: centralReference.groupCondition,
+                    metadata: {
+                        Version: version
+                    }
+                }]);
+            return true;
+        }
+        const centralManagement = await readCentralPackageManagement(project.path);
+        if (!centralManagement.enabled || !centralManagement.path || existingReference) {
+            return false;
+        }
+        await (0, projectFileEditor_1.updateProjectItemReferences)(project.path, [{
+                action: 'add',
+                elementName: 'PackageReference',
+                include: packageId
+            }]);
+        await (0, projectFileEditor_1.updateProjectItemReferences)(centralManagement.path, [{
+                action: 'add',
+                elementName: 'PackageVersion',
+                include: packageId,
+                metadata: {
+                    Version: version
+                }
+            }]);
+        return true;
+    }
 }
 exports.NuGetManagerView = NuGetManagerView;
 function getProjectsForNode(node, state) {
@@ -665,11 +802,13 @@ function toWebProject(project) {
             name: reference.name || reference.include,
             version: reference.version || reference.centralVersion || reference.resolvedVersion,
             centralVersion: reference.centralVersion,
-            versionSource: reference.versionSource
+            versionSource: reference.versionSource,
+            canUpdate: canUpdatePackageReference(project, reference),
+            updateBlockedReason: getPackageReferenceUpdateBlockedReason(reference)
         })).filter((reference) => reference.id)
     };
 }
-function getPackageSources(projects) {
+function getPackageSources(projects, protocolSources = []) {
     const sources = new Map();
     for (const source of getSettingsSources()) {
         sources.set(source.url.toLowerCase(), source);
@@ -691,13 +830,138 @@ function getPackageSources(projects) {
             });
         }
     }
-    sources.set(NUGET_ORG_SOURCE.value.toLowerCase(), {
-        name: NUGET_ORG_SOURCE.key,
-        url: NUGET_ORG_SOURCE.value,
-        editable: true,
-        origin: 'settings'
-    });
+    for (const source of protocolSources) {
+        if (!source.url) {
+            continue;
+        }
+        const key = source.url.toLowerCase();
+        if (!sources.has(key)) {
+            sources.set(key, source);
+        }
+    }
+    if (!sources.has(NUGET_ORG_SOURCE.value.toLowerCase())) {
+        sources.set(NUGET_ORG_SOURCE.value.toLowerCase(), {
+            name: NUGET_ORG_SOURCE.key,
+            url: NUGET_ORG_SOURCE.value,
+            editable: true,
+            origin: 'settings'
+        });
+    }
     return [...sources.values()];
+}
+function mapProtocolPackage(item, sourceUrl) {
+    const id = String(item.Name || item.name || item.Id || item.id || '');
+    const authors = item.Authors || item.authors || [];
+    const tags = item.Tags || item.tags || [];
+    const versions = item.Versions || item.versions || [];
+    return {
+        id,
+        name: id,
+        sourceUrl,
+        version: String(item.Version || item.version || ''),
+        description: String(item.Description || item.description || ''),
+        authors: Array.isArray(authors) ? authors.join(', ') : String(authors || ''),
+        totalDownloads: Number(item.TotalDownloads || item.totalDownloads || 0),
+        versions: Array.isArray(versions)
+            ? versions.map((version) => ({
+                version: String(version.Version || version.version || ''),
+                downloads: Number(version.Downloads || version.downloads || 0)
+            })).filter((version) => version.version)
+            : [],
+        projectUrl: item.ProjectUrl || item.projectUrl,
+        iconUrl: item.IconUrl || item.iconUrl,
+        licenseUrl: item.LicenseUrl || item.licenseUrl,
+        tags: Array.isArray(tags) ? tags.join(', ') : String(tags || '')
+    };
+}
+function mapProtocolDependencyGroups(details) {
+    const frameworks = details?.Dependencies?.Frameworks || details?.dependencies?.frameworks || {};
+    return Object.entries(frameworks).map(([targetFramework, dependencies]) => ({
+        targetFramework,
+        dependencies: (Array.isArray(dependencies) ? dependencies : []).map((dependency) => ({
+            id: String(dependency.Package || dependency.package || dependency.Id || dependency.id || ''),
+            range: dependency.VersionRange || dependency.versionRange
+        })).filter((dependency) => dependency.id)
+    }));
+}
+function findPackageReference(project, packageId) {
+    const normalized = normalizePackageId(packageId);
+    return (project.metadata?.packageReferences || []).find((reference) => {
+        return normalizePackageId(reference.name || reference.include || '') === normalized;
+    });
+}
+function findCentralPackageVersion(project, packageId) {
+    const normalized = normalizePackageId(packageId);
+    return (project.metadata?.centralPackageVersions || []).find((reference) => {
+        return normalizePackageId(reference.name || reference.include || '') === normalized;
+    });
+}
+function isCentralPackageReference(reference) {
+    return Boolean(reference && (reference.versionSource === 'Directory.Packages.props' ||
+        reference.centralVersion ||
+        reference.centralPackageVersion));
+}
+function canUpdatePackageReference(project, reference) {
+    if (!isCentralPackageReference(reference)) {
+        return true;
+    }
+    const centralReference = reference.centralPackageVersion || findCentralPackageVersion(project, reference.name || reference.include || '');
+    return Boolean(centralReference?.path) && !hasReferenceCondition(reference) && !hasReferenceCondition(centralReference);
+}
+function getPackageReferenceUpdateBlockedReason(reference) {
+    if (isCentralPackageReference(reference) && hasReferenceCondition(reference)) {
+        return 'Conditional central package versions must be edited manually.';
+    }
+    return undefined;
+}
+function hasReferenceCondition(reference) {
+    return Boolean(reference?.condition || reference?.itemCondition || reference?.groupCondition || reference?.versionSourceCondition);
+}
+function normalizePackageId(value) {
+    return String(value || '').trim().toLowerCase();
+}
+function getErrorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+async function readCentralPackageManagement(projectPath) {
+    const propsPath = await findNearestCentralPackageProps(projectPath);
+    if (!propsPath) {
+        return { enabled: false };
+    }
+    const buffer = await vscode.workspace.fs.readFile(vscode.Uri.file(propsPath));
+    const text = Buffer.from(buffer).toString('utf8');
+    const enabled = /<ManagePackageVersionsCentrally\b[^>]*>\s*true\s*<\/ManagePackageVersionsCentrally>/i.test(text);
+    return {
+        enabled,
+        path: propsPath
+    };
+}
+async function findNearestCentralPackageProps(projectPath) {
+    const projectUri = vscode.Uri.file(projectPath);
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(projectUri);
+    const stopDirectory = workspaceFolder?.uri.fsPath || path.parse(projectPath).root;
+    let currentDirectory = path.dirname(projectPath);
+    while (true) {
+        const candidate = path.join(currentDirectory, 'Directory.Packages.props');
+        try {
+            const stat = await vscode.workspace.fs.stat(vscode.Uri.file(candidate));
+            if (stat.type === vscode.FileType.File) {
+                return candidate;
+            }
+        }
+        catch {
+            // Keep walking toward the workspace root.
+        }
+        if (normalizePath(currentDirectory) === normalizePath(stopDirectory)) {
+            break;
+        }
+        const parentDirectory = path.dirname(currentDirectory);
+        if (parentDirectory === currentDirectory) {
+            break;
+        }
+        currentDirectory = parentDirectory;
+    }
+    return undefined;
 }
 async function searchNuGetPackages(sourceUrl, query, prerelease) {
     const searchUrl = await getSearchServiceUrl(sourceUrl);
@@ -890,3 +1154,10 @@ function normalizePath(value) {
     const resolved = path.resolve(value || '');
     return process.platform === 'linux' ? resolved : resolved.toLowerCase();
 }
+const __test = {
+    canUpdatePackageReference,
+    getPackageSources,
+    mapProtocolDependencyGroups,
+    mapProtocolPackage
+};
+exports.__test = __test;
