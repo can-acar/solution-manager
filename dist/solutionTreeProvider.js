@@ -80,6 +80,30 @@ class SolutionTreeProvider {
         this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
         this.currentState = undefined;
         this.treeView = undefined;
+        this.autoRefreshTimer = undefined;
+        const scannerSubscription = this.scanner.onDidChange(() => this.scheduleAutoRefresh());
+        if (context && Array.isArray(context.subscriptions)) {
+            context.subscriptions.push(scannerSubscription, {
+                dispose: () => {
+                    if (this.autoRefreshTimer) {
+                        clearTimeout(this.autoRefreshTimer);
+                        this.autoRefreshTimer = undefined;
+                    }
+                }
+            });
+        }
+    }
+    scheduleAutoRefresh() {
+        if (this.autoRefreshTimer) {
+            clearTimeout(this.autoRefreshTimer);
+        }
+        this.autoRefreshTimer = setTimeout(() => {
+            this.autoRefreshTimer = undefined;
+            this.refresh({ userVisible: false }).catch((error) => {
+                const message = error instanceof Error ? error.message : String(error);
+                vscode.window.showErrorMessage(`Solution Manager: ${message}`);
+            });
+        }, 300);
     }
     setTreeView(treeView) {
         this.treeView = treeView;

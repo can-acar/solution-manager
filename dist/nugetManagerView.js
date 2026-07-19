@@ -170,10 +170,35 @@ class NuGetManagerView {
                 if (projects.length === 0) {
                     throw new Error(`Package '${packageId}' is not installed in the selected scope.`);
                 }
+                let removedFromProjectFiles = 0;
+                let terminalRemovals = 0;
                 for (const project of projects) {
-                    this.terminalRunner.runCommand(`dotnet remove ${(0, terminalRunner_1.quoteForShell)(project.path)} package ${(0, terminalRunner_1.quoteForShell)(packageId)}`);
+                    try {
+                        await (0, projectFileEditor_1.updateProjectItemReferences)(project.path, [{
+                                action: 'remove',
+                                elementName: 'PackageReference',
+                                include: packageId
+                            }]);
+                        removedFromProjectFiles += 1;
+                    }
+                    catch {
+                        this.terminalRunner.runCommand(`dotnet remove ${(0, terminalRunner_1.quoteForShell)(project.path)} package ${(0, terminalRunner_1.quoteForShell)(packageId)}`);
+                        terminalRemovals += 1;
+                    }
                 }
-                await this.postNotice(message.requestId, `Remove command sent for ${projects.length} project${projects.length === 1 ? '' : 's'}.`);
+                if (removedFromProjectFiles > 0) {
+                    await this.refresh({ userVisible: false });
+                    const state = await this.getState();
+                    this.projects = mergeFreshProjectMetadata(this.projects, state);
+                    await this.postState(message.requestId);
+                }
+                const removedMessage = removedFromProjectFiles > 0
+                    ? `Removed '${packageId}' from ${removedFromProjectFiles} project file${removedFromProjectFiles === 1 ? '' : 's'}`
+                    : '';
+                const terminalMessage = terminalRemovals > 0
+                    ? `${terminalRemovals} terminal command${terminalRemovals === 1 ? '' : 's'}`
+                    : '';
+                await this.postNotice(message.requestId, `${[removedMessage, terminalMessage].filter(Boolean).join(', ') || `Remove requested for ${projects.length} project${projects.length === 1 ? '' : 's'}`}.`);
                 return;
             }
             if (message.type === 'clearCache') {

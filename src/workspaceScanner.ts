@@ -15,12 +15,18 @@ class WorkspaceScanner {
     this.context = context;
     this.projectCache = new Map();
     this.sharedDirty = false;
+    this.onDidChangeEmitter = new vscode.EventEmitter();
+    this.onDidChange = this.onDidChangeEmitter.event;
     this.registerInvalidationWatchers();
   }
 
   registerInvalidationWatchers() {
+    const notifyChange = () => {
+      this.onDidChangeEmitter.fire();
+    };
     const markSharedDirty = () => {
       this.sharedDirty = true;
+      notifyChange();
     };
     const sharedWatcher = vscode.workspace.createFileSystemWatcher(
       '**/{Directory.Build.props,Directory.Build.targets,Directory.Packages.props,nuget.config,NuGet.Config,NuGet.config,global.json,packages.lock.json,project.assets.json}'
@@ -30,18 +36,27 @@ class WorkspaceScanner {
     sharedWatcher.onDidDelete(markSharedDirty);
 
     const projectWatcher = vscode.workspace.createFileSystemWatcher('**/*.{csproj,fsproj,vbproj,proj}');
-    const dropProject = (uri) => this.projectCache.delete(normalizePath(uri.fsPath));
+    const dropProject = (uri) => {
+      this.projectCache.delete(normalizePath(uri.fsPath));
+      notifyChange();
+    };
     projectWatcher.onDidChange(dropProject);
     projectWatcher.onDidCreate(dropProject);
     projectWatcher.onDidDelete(dropProject);
 
+    const solutionWatcher = vscode.workspace.createFileSystemWatcher('**/*.{sln,slnx}');
+    solutionWatcher.onDidCreate(notifyChange);
+    solutionWatcher.onDidChange(notifyChange);
+    solutionWatcher.onDidDelete(notifyChange);
+
     const folderListener = vscode.workspace.onDidChangeWorkspaceFolders(() => {
       this.projectCache.clear();
       this.sharedDirty = true;
+      notifyChange();
     });
 
     if (this.context && Array.isArray(this.context.subscriptions)) {
-      this.context.subscriptions.push(sharedWatcher, projectWatcher, folderListener);
+      this.context.subscriptions.push(sharedWatcher, projectWatcher, solutionWatcher, folderListener, this.onDidChangeEmitter);
     }
   }
 
