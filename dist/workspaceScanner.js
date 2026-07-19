@@ -1775,3 +1775,4 @@ function normalizePath(value) {
     const resolved = path.resolve(value);
     return process.platform === 'linux' ? resolved : resolved.toLowerCase();
 }
+//# sourceMappingURL=workspaceScanner.js.map

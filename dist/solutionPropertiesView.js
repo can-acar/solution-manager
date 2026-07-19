@@ -62,6 +62,9 @@ function showSolutionProperties(context, solution, model, onChange) {
             return;
         }
         if (message.command === 'change') {
+            if (currentModel.format === 'slnx') {
+                return;
+            }
             try {
                 currentModel = await onChange({
                     projectGuid: message.projectGuid,
@@ -94,7 +97,7 @@ function getSolutionPropertiesHtml(solution, model, selectedConfiguration, nonce
         ? `<div class="notice">${escapeHtml(notice)}</div>`
         : '';
     const slnxNotice = model.format === 'slnx'
-        ? '<div class="hint">.slnx: yalnızca birebir eşleşen kurallar okunur/yazılır; joker (wildcard) kurallar yorumlanmaz.</div>'
+        ? '<div class="hint">.slnx: bu görünüm salt-okunurdur. Proje yapılandırması çıkarımla gösterilir; .slnx yazma henüz desteklenmiyor (yalnızca .sln düzenlenebilir).</div>'
         : '';
     return `<!DOCTYPE html>
 <html lang="en">
@@ -170,14 +173,15 @@ function renderProjectRow(project, model, selectedConfiguration) {
         || project.configurations[0]
         || { solutionConfiguration: selectedConfiguration, configPlatform: selectedConfiguration, build: false, deploy: false };
     const dataAttributes = `data-guid="${escapeAttribute(project.guid || '')}" data-path="${escapeAttribute(project.relativePath || '')}" data-solution-config="${escapeAttribute(entry.solutionConfiguration)}"`;
+    const readOnly = model.format === 'slnx' ? ' disabled' : '';
     const options = buildConfigPlatformOptions(model.configPlatformOptions, entry.configPlatform)
         .map((option) => `<option value="${escapeAttribute(option)}"${option === entry.configPlatform ? ' selected' : ''}>${escapeHtml(option)}</option>`)
         .join('');
     return `<tr>
     <td>${escapeHtml(project.name)}</td>
-    <td><select ${dataAttributes} data-field="configPlatform">${options}</select></td>
-    <td class="center"><input type="checkbox" ${dataAttributes} data-field="build"${entry.build ? ' checked' : ''} /></td>
-    <td class="center"><input type="checkbox" ${dataAttributes} data-field="deploy"${entry.deploy ? ' checked' : ''} /></td>
+    <td><select ${dataAttributes} data-field="configPlatform"${readOnly}>${options}</select></td>
+    <td class="center"><input type="checkbox" ${dataAttributes} data-field="build"${entry.build ? ' checked' : ''}${readOnly} /></td>
+    <td class="center"><input type="checkbox" ${dataAttributes} data-field="deploy"${entry.deploy ? ' checked' : ''}${readOnly} /></td>
     <td class="deps">${Number(project.dependencyCount || 0)}</td>
   </tr>`;
 }
@@ -202,3 +206,4 @@ function escapeHtml(value) {
 function escapeAttribute(value) {
     return escapeHtml(value).replace(/`/g, '&#96;');
 }
+//# sourceMappingURL=solutionPropertiesView.js.map

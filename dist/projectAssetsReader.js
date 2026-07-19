@@ -140,3 +140,4 @@ function sortPackages(packages) {
         });
     });
 }
+//# sourceMappingURL=projectAssetsReader.js.map

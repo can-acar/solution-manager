@@ -431,3 +431,4 @@ function unescapeXmlAttribute(value) {
 function escapeRegExp(value) {
     return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+//# sourceMappingURL=projectFileEditor.js.map

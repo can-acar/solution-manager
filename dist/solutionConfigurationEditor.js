@@ -363,3 +363,4 @@ function applySlnxProjectRule(projectElement, solutionConfiguration, change) {
 function escapeRegExp(value) {
     return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+//# sourceMappingURL=solutionConfigurationEditor.js.map

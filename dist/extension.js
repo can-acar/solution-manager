@@ -137,3 +137,4 @@ function updateAspireTemplateContext() {
         vscode.commands.executeCommand('setContext', 'solutionManager.hasAspireTemplate', hasAspireTemplate);
     });
 }
+//# sourceMappingURL=extension.js.map

@@ -141,3 +141,4 @@ class NuGetProtocolHost {
     }
 }
 exports.NuGetProtocolHost = NuGetProtocolHost;
+//# sourceMappingURL=nugetProtocolHost.js.map

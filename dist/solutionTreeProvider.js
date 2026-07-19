@@ -2358,3 +2358,4 @@ const __test = {
     normalizeNuGetPackageVersion
 };
 exports.__test = __test;
+//# sourceMappingURL=solutionTreeProvider.js.map

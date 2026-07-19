@@ -56,3 +56,4 @@ async function openScopedFindInFiles(folderPath, replace) {
 async function openScopedQuickOpen(folderPath) {
     await vscode.commands.executeCommand('workbench.action.quickOpen', toSearchScope(folderPath));
 }
+//# sourceMappingURL=searchActions.js.map

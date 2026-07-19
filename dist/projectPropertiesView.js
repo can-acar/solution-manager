@@ -2196,3 +2196,4 @@ const __test = {
     getProjectPropertiesHtml
 };
 exports.__test = __test;
+//# sourceMappingURL=projectPropertiesView.js.map

@@ -2407,3 +2407,4 @@ const __test = {
     mapProtocolPackage
 };
 exports.__test = __test;
+//# sourceMappingURL=nugetManagerView.js.map
