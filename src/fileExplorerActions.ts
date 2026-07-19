@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 
 const DRAG_MIME_TYPE = 'application/vnd.code.tree.solutionmanager';
 const CLIPBOARD_CONTEXT_KEY = 'solutionManager.hasClipboard';
+const PROJECT_AND_SOLUTION_EXTENSIONS = new Set(['.sln', '.slnx', '.csproj', '.fsproj', '.vbproj', '.proj']);
 
 class FileExplorerActions {
   constructor(refresh) {
@@ -15,6 +16,10 @@ class FileExplorerActions {
     const uri = nodeUri(node);
 
     if (!uri) {
+      return;
+    }
+
+    if (!(await this.confirmSolutionAwareOperation([uri], 'rename'))) {
       return;
     }
 
@@ -50,8 +55,12 @@ class FileExplorerActions {
     const label = uris.length === 1
       ? `'${path.basename(uris[0].fsPath)}'`
       : `${uris.length} items`;
+    const solutionAware = uris.filter(isProjectOrSolutionFile);
+    const detail = solutionAware.length > 0
+      ? ` Note: ${solutionAware.map((uri) => path.basename(uri.fsPath)).join(', ')} is a project or solution file; its solution (.sln/.slnx) entries and references in other projects will NOT be updated.`
+      : '';
     const confirmation = await vscode.window.showWarningMessage(
-      `Are you sure you want to delete ${label}? It will be moved to the trash.`,
+      `Are you sure you want to delete ${label}? It will be moved to the trash.${detail}`,
       { modal: true },
       'Move to Trash'
     );
@@ -60,11 +69,18 @@ class FileExplorerActions {
       return;
     }
 
+    const errors = [];
+
     for (const uri of uris) {
-      await vscode.workspace.fs.delete(uri, { recursive: true, useTrash: true });
+      try {
+        await vscode.workspace.fs.delete(uri, { recursive: true, useTrash: true });
+      } catch (error) {
+        errors.push({ uri, error });
+      }
     }
 
     await this.refresh();
+    reportTransferErrors(errors);
   }
 
   cut(nodes) {
@@ -87,29 +103,53 @@ class FileExplorerActions {
     }
 
     const operation = this.clipboard.operation;
-    await this.transfer(this.clipboard.uris, targetDirectory, operation);
 
-    if (operation === 'cut') {
-      this.setClipboard([], 'copy');
+    try {
+      const result = await this.transfer(this.clipboard.uris, targetDirectory, operation);
+
+      if (result.cancelled) {
+        return;
+      }
+
+      if (operation === 'cut') {
+        this.setClipboard([], 'copy');
+      }
+
+      reportTransferErrors(result.errors);
+    } finally {
+      await this.refresh();
     }
-
-    await this.refresh();
   }
 
   async transfer(uris, targetDirectory, operation) {
+    if (operation === 'cut' && !(await this.confirmSolutionAwareOperation(uris, 'move'))) {
+      return { cancelled: true, succeeded: [], errors: [] };
+    }
+
+    const succeeded = [];
+    const errors = [];
+
     for (const uri of uris) {
       if (isSameOrParent(uri, targetDirectory)) {
         continue;
       }
 
-      const destination = await uniqueDestination(targetDirectory, path.basename(uri.fsPath));
+      try {
+        const destination = await uniqueDestination(targetDirectory, path.basename(uri.fsPath));
 
-      if (operation === 'cut') {
-        await vscode.workspace.fs.rename(uri, destination, { overwrite: false });
-      } else {
-        await vscode.workspace.fs.copy(uri, destination, { overwrite: false });
+        if (operation === 'cut') {
+          await vscode.workspace.fs.rename(uri, destination, { overwrite: false });
+        } else {
+          await vscode.workspace.fs.copy(uri, destination, { overwrite: false });
+        }
+
+        succeeded.push(uri);
+      } catch (error) {
+        errors.push({ uri, error });
       }
     }
+
+    return { cancelled: false, succeeded, errors };
   }
 
   async revealInOS(node) {
@@ -149,12 +189,29 @@ class FileExplorerActions {
     vscode.commands.executeCommand('setContext', CLIPBOARD_CONTEXT_KEY, Boolean(this.clipboard));
   }
 
+  async confirmSolutionAwareOperation(uris, verb) {
+    const affected = uris.filter(isProjectOrSolutionFile);
+
+    if (affected.length === 0) {
+      return true;
+    }
+
+    const names = affected.map((uri) => path.basename(uri.fsPath)).join(', ');
+    const choice = await vscode.window.showWarningMessage(
+      `${names} is a project or solution file. Solution Manager will ${verb} it on disk but will NOT update solution (.sln/.slnx) entries or references in other projects. Continue?`,
+      { modal: true },
+      'Continue'
+    );
+
+    return choice === 'Continue';
+  }
+
   createDragAndDropController() {
     return {
       dropMimeTypes: [DRAG_MIME_TYPE],
       dragMimeTypes: [DRAG_MIME_TYPE],
       handleDrag: (source, dataTransfer) => {
-        const uris = toUris(source).map((uri) => uri.toString());
+        const uris = toUris((source || []).filter(isFileSystemNode)).map((uri) => uri.toString());
 
         if (uris.length > 0) {
           dataTransfer.set(DRAG_MIME_TYPE, new vscode.DataTransferItem(uris.join('\n')));
@@ -176,15 +233,38 @@ class FileExplorerActions {
         }
 
         try {
-          await this.transfer(uris, targetDirectory, 'cut');
-          await this.refresh();
+          const result = await this.transfer(uris, targetDirectory, 'cut');
+          reportTransferErrors(result.errors);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           vscode.window.showErrorMessage(`Solution Manager: ${message}`);
+        } finally {
+          await this.refresh();
         }
       }
     };
   }
+}
+
+function reportTransferErrors(errors) {
+  if (!errors || errors.length === 0) {
+    return;
+  }
+
+  const detail = errors
+    .map(({ uri, error }) => `${path.basename(uri.fsPath)}: ${error instanceof Error ? error.message : String(error)}`)
+    .join('; ');
+  vscode.window.showErrorMessage(
+    `Solution Manager: ${errors.length} item(s) could not be processed. ${detail}`
+  );
+}
+
+function isFileSystemNode(node) {
+  return Boolean(node) && (node.kind === 'file' || node.kind === 'directory');
+}
+
+function isProjectOrSolutionFile(uri) {
+  return PROJECT_AND_SOLUTION_EXTENSIONS.has(path.extname(uri.fsPath).toLowerCase());
 }
 
 function nodeUri(node) {
@@ -236,9 +316,15 @@ function resolveDirectoryUri(node) {
 }
 
 function isSameOrParent(sourceUri, targetDirectory) {
-  const source = sourceUri.fsPath;
-  const target = targetDirectory.fsPath;
-  return source === target || path.dirname(source) === target;
+  const source = path.resolve(sourceUri.fsPath);
+  const target = path.resolve(targetDirectory.fsPath);
+
+  if (source === target || path.dirname(source) === target) {
+    return true;
+  }
+
+  const relative = path.relative(source, target);
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
 }
 
 async function uniqueDestination(targetDirectory, name) {

@@ -282,13 +282,36 @@ class SolutionActions {
 
     const projectDirectory = path.resolve(path.dirname(solution.path), relativeFolder.trim());
     const projectPath = path.join(projectDirectory, `${appHostName.trim()}.csproj`);
+    const projectUri = vscode.Uri.file(projectPath);
+
+    if (await fileExists(projectUri)) {
+      vscode.window.showWarningMessage(`Solution Manager: ${path.basename(projectPath)} already exists.`);
+      return;
+    }
 
     this.terminalRunner.runCommand(`dotnet new aspire -n ${quoteForShell(appHostName.trim())} -o ${quoteForShell(projectDirectory)}`);
+
+    const created = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Solution Manager: waiting for the Aspire AppHost project to be created…',
+        cancellable: true
+      },
+      (_progress, token) => waitForFile(projectUri, 120000, 500, token)
+    );
+
+    if (!created) {
+      vscode.window.showWarningMessage(
+        `Solution Manager: ${path.basename(projectPath)} was not created. Once the terminal command finishes, use "Add Existing Project" to add it to the solution.`
+      );
+      return;
+    }
+
     await addProjectToSolutionFile(solution.path, projectPath, {
       name: appHostName.trim()
     });
     await this.refresh({ userVisible: true });
-    vscode.window.showInformationMessage('Solution Manager: Aspire template command was sent to the terminal and the expected AppHost project was added to the solution.');
+    vscode.window.showInformationMessage('Solution Manager: Aspire AppHost project was created and added to the solution.');
   }
 
   async addExistingProject(solution) {
@@ -626,7 +649,13 @@ async function writeProjectFile(projectPath, content) {
 }
 
 async function writeTextFile(filePath, content) {
-  await vscode.workspace.fs.writeFile(vscode.Uri.file(filePath), Buffer.from(content, 'utf8'));
+  const fileUri = vscode.Uri.file(filePath);
+
+  if (await fileExists(fileUri)) {
+    throw new Error(`${path.basename(filePath)} already exists.`);
+  }
+
+  await vscode.workspace.fs.writeFile(fileUri, Buffer.from(content, 'utf8'));
 }
 
 async function fileExists(uri) {
@@ -636,6 +665,24 @@ async function fileExists(uri) {
   } catch {
     return false;
   }
+}
+
+async function waitForFile(uri, timeoutMs, intervalMs, token) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (token?.isCancellationRequested) {
+      return false;
+    }
+
+    if (await fileExists(uri)) {
+      return true;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  return await fileExists(uri);
 }
 
 function createSdkProjectXml(sdk, targetFramework, extraProperty = '') {

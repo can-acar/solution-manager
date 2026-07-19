@@ -19,7 +19,7 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": false,
-    "sourceMap": false,
+    "sourceMap": true,
     "declaration": false,
     "types": [
       "node",
