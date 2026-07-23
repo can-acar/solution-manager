@@ -33,10 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.__test = void 0;
 exports.showSolutionProperties = showSolutionProperties;
 // @ts-nocheck
 const crypto = __importStar(require("crypto"));
 const vscode = __importStar(require("vscode"));
+const webviewUi_1 = require("#src/webviewUi");
 function showSolutionProperties(context, solution, model, onChange) {
     const panel = vscode.window.createWebviewPanel('solutionManager.solutionProperties', `Solution Properties - ${solution.name}`, vscode.ViewColumn.Active, {
         enableScripts: true,
@@ -97,7 +99,7 @@ function getSolutionPropertiesHtml(solution, model, selectedConfiguration, nonce
         ? `<div class="notice">${escapeHtml(notice)}</div>`
         : '';
     const slnxNotice = model.format === 'slnx'
-        ? '<div class="hint">.slnx: bu görünüm salt-okunurdur. Proje yapılandırması çıkarımla gösterilir; .slnx yazma henüz desteklenmiyor (yalnızca .sln düzenlenebilir).</div>'
+        ? '<div class="hint">This .slnx view is read-only. Project configurations are inferred because writing .slnx files is not supported yet; only .sln files can be edited.</div>'
         : '';
     return `<!DOCTYPE html>
 <html lang="en">
@@ -106,45 +108,178 @@ function getSolutionPropertiesHtml(solution, model, selectedConfiguration, nonce
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style nonce="${nonce}">
-    body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 16px; }
-    h1 { font-size: 1.2rem; margin: 0 0 16px; }
-    .config-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-    .config-row label { font-weight: 600; }
-    select, .table select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); padding: 4px 8px; border-radius: 4px; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--vscode-panel-border); }
-    th { color: var(--vscode-descriptionForeground); font-weight: 600; }
-    td.center, th.center { text-align: center; }
-    td.deps { text-align: right; color: var(--vscode-textLink-foreground); }
-    .notice { margin-bottom: 12px; padding: 6px 10px; background: var(--vscode-editorInfo-background, rgba(0,120,215,0.1)); border-radius: 4px; }
-    .hint { margin: 8px 0 0; color: var(--vscode-descriptionForeground); font-size: 0.85rem; }
-    .empty { color: var(--vscode-descriptionForeground); }
+    ${(0, webviewUi_1.getWebviewUiStyles)()}
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      color: var(--ui-text);
+      background: var(--ui-bg);
+    }
+    body {
+      overflow: auto;
+    }
+    .solution-shell {
+      min-height: 100vh;
+      background: var(--ui-bg);
+    }
+    .titlebar {
+      display: flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 var(--ui-space-4);
+      border-bottom: 1px solid var(--ui-border);
+      background: var(--vscode-editorGroupHeader-tabsBackground, var(--ui-bg));
+    }
+    h1 {
+      min-width: 0;
+      margin: 0;
+      overflow: hidden;
+      font-size: 14px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .solution-content {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      padding: var(--ui-space-5);
+    }
+    .config-row {
+      display: flex;
+      align-items: center;
+      gap: var(--ui-space-3);
+      margin-bottom: var(--ui-space-4);
+      padding-bottom: var(--ui-space-4);
+      border-bottom: 1px solid var(--ui-border);
+    }
+    .config-row label {
+      font-weight: 600;
+    }
+    select,
+    .table select {
+      min-height: var(--ui-control-height);
+      padding: 3px 8px;
+      color: var(--vscode-dropdown-foreground);
+      background: var(--vscode-dropdown-background);
+      border: 1px solid var(--vscode-dropdown-border, var(--ui-control-border));
+      border-radius: var(--ui-radius);
+    }
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      accent-color: var(--ui-focus);
+    }
+    .table {
+      overflow: hidden;
+      border: 1px solid var(--ui-border);
+      border-radius: var(--ui-radius);
+      background: var(--ui-surface);
+    }
+    .table-scroll {
+      width: 100%;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+    }
+    th,
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--ui-border);
+      text-align: left;
+    }
+    th {
+      color: var(--ui-text-muted);
+      background: var(--vscode-editorGroupHeader-tabsBackground, var(--ui-surface));
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    tbody tr:hover {
+      background: var(--ui-surface-hover);
+    }
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+    td.center,
+    th.center {
+      text-align: center;
+    }
+    td.deps {
+      color: var(--vscode-textLink-foreground);
+      text-align: right;
+    }
+    .notice,
+    .hint {
+      margin-bottom: var(--ui-space-3);
+      padding: 8px 10px;
+      border: 1px solid var(--ui-border);
+      border-radius: var(--ui-radius);
+    }
+    .notice {
+      color: var(--vscode-notificationsInfoIcon-foreground, var(--ui-text));
+      background: var(--vscode-editorInfo-background, var(--ui-surface));
+    }
+    .hint {
+      margin-top: var(--ui-space-3);
+      margin-bottom: 0;
+      color: var(--ui-text-muted);
+      background: var(--ui-surface);
+      font-size: 12px;
+    }
+    .empty {
+      color: var(--ui-text-muted);
+    }
+    @media (max-width: 760px) {
+      .solution-content {
+        padding: var(--ui-space-4);
+      }
+      .config-row {
+        align-items: stretch;
+        flex-direction: column;
+        gap: var(--ui-space-2);
+      }
+      .config-row select {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Solution Properties - ${escapeHtml(solution.name)}</h1>
-  ${noticeMarkup}
-  <div class="config-row">
-    <label for="solutionConfiguration">Solution configuration:</label>
-    <select id="solutionConfiguration">${configurationOptions}</select>
+  <div class="solution-shell">
+    <header class="titlebar">
+      <h1>Solution Properties - ${escapeHtml(solution.name)}</h1>
+    </header>
+    <main class="solution-content">
+      ${noticeMarkup}
+      <div class="config-row">
+        <label for="solutionConfiguration">Solution configuration:</label>
+        <select id="solutionConfiguration">${configurationOptions}</select>
+      </div>
+      <div class="table">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Configuration and Platform</th>
+                <th class="center">Build</th>
+                <th class="center">Deploy</th>
+                <th>Dependencies</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="5" class="empty">No projects.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ${slnxNotice}
+    </main>
   </div>
-  <div class="table">
-    <table>
-      <thead>
-        <tr>
-          <th>Project</th>
-          <th>Configuration and Platform</th>
-          <th class="center">Build</th>
-          <th class="center">Deploy</th>
-          <th>Dependencies</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows || '<tr><td colspan="5" class="empty">No projects.</td></tr>'}
-      </tbody>
-    </table>
-  </div>
-  ${slnxNotice}
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     document.getElementById('solutionConfiguration').addEventListener('change', (event) => {
@@ -206,4 +341,8 @@ function escapeHtml(value) {
 function escapeAttribute(value) {
     return escapeHtml(value).replace(/`/g, '&#96;');
 }
+const __test = {
+    getSolutionPropertiesHtml
+};
+exports.__test = __test;
 //# sourceMappingURL=solutionPropertiesView.js.map

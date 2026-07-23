@@ -14,8 +14,10 @@ const files = [
   'dist/nugetProtocolHost.js',
   'dist/solutionActions.js',
   'dist/solutionFileEditor.js',
+  'dist/solutionPropertiesView.js',
   'dist/solutionTreeProvider.js',
   'dist/terminalRunner.js',
+  'dist/webviewUi.js',
   'dist/workspaceScanner.js',
   'scripts/validate.js'
 ];
@@ -59,6 +61,7 @@ async function main() {
   validateLaunchSettingsEditor();
   await validateProjectMetadataParser();
   validateProjectPropertiesView();
+  validateSolutionPropertiesView();
   validateProjectActions();
   validateProjectPropertyEditor();
   validateSolutionFileEditor();
@@ -69,6 +72,8 @@ async function main() {
 function validateManifest() {
   const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
   const extensionSource = fs.readFileSync(path.join(process.cwd(), 'src/extension.ts'), 'utf8');
+  const activityIcon = fs.readFileSync(path.join(process.cwd(), 'media/activity-icon.svg'), 'utf8');
+  const solutionTreeSource = fs.readFileSync(path.join(process.cwd(), 'src/solutionTreeProvider.ts'), 'utf8');
   const contributedCommands = new Set(packageJson.contributes.commands.map((command) => command.command));
   const registeredCommands = new Set([...extensionSource.matchAll(/registerCommand\('([^']+)'/g)].map((match) => match[1]));
   const missingRegistrations = [...contributedCommands].filter((command) => !registeredCommands.has(command));
@@ -116,6 +121,11 @@ function validateManifest() {
   }
 
   const viewItemMenus = menus['view/item/context'] || [];
+
+  assert(activityIcon.includes('currentColor'), 'Activity Bar icon is not theme-aware.');
+  assert(!activityIcon.includes('linearGradient'), 'Activity Bar icon must remain monochrome.');
+  assert(solutionTreeSource.includes("case 'solution':\n      return new vscode.ThemeIcon('symbol-namespace');"), 'Solution tree does not use a semantic solution Codicon.');
+  assert(solutionTreeSource.includes("case 'project':\n      return new vscode.ThemeIcon('symbol-class');"), 'Solution tree does not use a distinct semantic project Codicon.');
   assert(
     hasMenuSubmenu(viewItemMenus, 'solutionManager.solution.add', 'solution'),
     'Solution root does not expose Add submenu.'
@@ -416,10 +426,22 @@ function validateNuGetManagerView() {
   try {
     const { __test } = require(runtimeModulePath('nugetManagerView.js'));
     const nugetManagerSource = fs.readFileSync(path.join(process.cwd(), 'src/nugetManagerView.ts'), 'utf8');
+    const html = __test.getNuGetManagerHtml();
     assert(nugetManagerSource.includes('>All Solution</option>'), 'NuGet Manager project selector does not expose All Solution.');
     assert(!nugetManagerSource.includes('state.selectedProjectPath = state.projects[0].path'), 'NuGet Manager should not default to the first project.');
-    assert(nugetManagerSource.includes('Paketler'), 'NuGet Manager does not expose the packages tab.');
-    assert(nugetManagerSource.includes('Kaynaklar'), 'NuGet Manager does not expose the sources tab.');
+    assert(html.includes('>Packages</button>'), 'NuGet Manager does not expose the English Packages tab.');
+    assert(html.includes('>Sources</button>'), 'NuGet Manager does not expose the English Sources tab.');
+    assert(html.includes('>Browse</button>'), 'NuGet Manager does not expose the English Browse tab.');
+    assert(html.includes('>Installed</button>'), 'NuGet Manager does not expose the English Installed tab.');
+    assert(!html.includes('class="title-caption">NUGET'), 'NuGet Manager still renders the redundant NUGET title row.');
+    assert(html.includes('--ui-control-height'), 'NuGet Manager does not include the shared webview theme tokens.');
+    assert(html.includes('grid-template-areas: "search refresh clear project source prerelease action"'), 'NuGet Manager wide toolbar grid contract is missing.');
+    assert(html.includes('"search search refresh clear"'), 'NuGet Manager narrow toolbar does not expose an explicit two-row grid.');
+    assert(html.includes('grid-template-rows: minmax(240px, 1fr) minmax(240px, 1fr)'), 'NuGet Manager narrow split panes do not preserve 240px usable areas.');
+    assert(html.includes('.search-icon::before'), 'NuGet Manager custom search icon was not preserved.');
+    assert(html.includes('title="Resize package details panel"'), 'NuGet Manager splitter affordance was not preserved.');
+    assert(html.includes('<svg class="ui-icon"'), 'NuGet Manager actions do not render shared inline SVG icons.');
+    assert(!/[↻🗑↗×]/u.test(html), 'NuGet Manager still renders Unicode or emoji action icons.');
     assert(nugetManagerSource.includes('activePackageTab'), 'NuGet Manager does not expose package browse/installed tab state.');
     assert(nugetManagerSource.includes('installed-mode'), 'NuGet Manager does not switch the package layout for installed packages.');
     assert(nugetManagerSource.includes('.packages-page.installed-mode .content-split'), 'NuGet Manager installed layout can collapse into the browse summary grid row.');
@@ -2279,6 +2301,13 @@ function validateProjectPropertiesView() {
       'nonce'
     );
 
+    assert(html.includes('--ui-control-height'), 'Project Properties does not include the shared webview theme tokens.');
+    assert(html.includes('grid-template-rows: 44px minmax(0, 1fr) 52px'), 'Project Properties viewport grid does not preserve the fixed header and footer.');
+    assert(html.includes('grid-template-columns: clamp(240px, 24vw, 280px) minmax(0, 1fr)'), 'Project Properties sidebar is not responsive within the required range.');
+    assert(html.includes('grid-template-columns: clamp(160px, 20vw, 210px) minmax(0, 1fr)'), 'Project Properties form labels are not responsive within the required range.');
+    assert(html.includes('@media (max-width: 760px)'), 'Project Properties single-column form breakpoint is missing.');
+    assert(html.includes('padding: 6px 12px;'), 'Project Properties navigation still reserves the obsolete icon indent.');
+    assert(!html.includes('--bg: #18191c'), 'Project Properties still contains its fixed dark palette.');
     assert(configurations.some((item) => item.label === 'Staging | x64'), 'Custom configuration was not exposed to the properties view.');
     assert(configurations.some((item) => item.label === 'Debug | AnyCPU'), 'Debug fallback configuration was not exposed.');
     assert(configurations.some((item) => item.label === 'Release | AnyCPU'), 'Release fallback configuration was not exposed.');
@@ -2526,6 +2555,60 @@ function validateProjectPropertiesView() {
     assert(html.includes('data-value="PublishDir"'), 'Publish directory browse action was not rendered.');
     assert(html.includes('data-value="PublishUrl"'), 'Publish URL browse action was not rendered.');
     assert(html.includes('data-value="DocumentationFile"'), 'Documentation file browse action was not rendered.');
+  } finally {
+    Module._load = originalLoad;
+  }
+}
+
+function validateSolutionPropertiesView() {
+  const originalLoad = Module._load;
+
+  Module._load = function loadWithVscodeMock(request, parent, isMain) {
+    if (request === 'vscode') {
+      return {};
+    }
+
+    return originalLoad.call(this, request, parent, isMain);
+  };
+
+  try {
+    const { __test } = require(runtimeModulePath('solutionPropertiesView.js'));
+    const html = __test.getSolutionPropertiesHtml(
+      { name: 'Sample.slnx' },
+      {
+        format: 'slnx',
+        solutionConfigurations: ['Debug|Any CPU'],
+        configPlatformOptions: ['Debug|Any CPU', 'Release|Any CPU'],
+        projects: [
+          {
+            name: 'Sample.App',
+            guid: '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}',
+            relativePath: 'src/Sample.App/Sample.App.csproj',
+            dependencyCount: 2,
+            configurations: [
+              {
+                solutionConfiguration: 'Debug|Any CPU',
+                configPlatform: 'Debug|Any CPU',
+                build: true,
+                deploy: false
+              }
+            ]
+          }
+        ]
+      },
+      'Debug|Any CPU',
+      'test-nonce',
+      'Solution configuration updated.'
+    );
+
+    assert(html.includes('--ui-control-height'), 'Solution Properties does not include the shared webview theme tokens.');
+    assert(html.includes('width: min(1120px, 100%)'), 'Solution Properties content width is not capped at 1120px.');
+    assert(html.includes('class="table-scroll"'), 'Solution Properties table is not wrapped in a controlled horizontal scroller.');
+    assert(html.includes('min-width: 760px'), 'Solution Properties table does not preserve a usable narrow-panel width.');
+    assert(html.includes('This .slnx view is read-only.'), 'Solution Properties .slnx notice was not standardized in English.');
+    assert(!html.includes('salt-okunurdur'), 'Solution Properties still contains Turkish UI text.');
+    assert(html.includes(' disabled'), 'Solution Properties .slnx controls are not read-only.');
+    assert(html.includes('Solution configuration updated.'), 'Solution Properties notice surface was not rendered.');
   } finally {
     Module._load = originalLoad;
   }

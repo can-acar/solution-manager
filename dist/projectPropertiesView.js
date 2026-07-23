@@ -39,6 +39,7 @@ exports.showProjectProperties = showProjectProperties;
 const vscode = __importStar(require("vscode"));
 const launchSettingsEditor_1 = require("#src/launchSettingsEditor");
 const projectFileEditor_1 = require("#src/projectFileEditor");
+const webviewUi_1 = require("#src/webviewUi");
 const workspaceScanner_1 = require("#src/workspaceScanner");
 const CONFIGURATION_EDITOR_PROPERTIES = [
     'OutputPath',
@@ -180,17 +181,17 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
   <title>Project Properties - ${escapeHtml(project.name)}</title>
   <style nonce="${nonce}">
+    ${(0, webviewUi_1.getWebviewUiStyles)()}
     :root {
-      color-scheme: dark;
-      --bg: #18191c;
-      --line: #34383e;
-      --text: #d4d7dd;
-      --muted: #9a9ca3;
-      --field: #1f2227;
-      --field-line: #454a52;
-      --accent: #31518d;
-      --accent-strong: #3f6fcb;
-      --button: #3478e5;
+      --bg: var(--ui-bg);
+      --line: var(--ui-border);
+      --text: var(--ui-text);
+      --muted: var(--ui-text-muted);
+      --field: var(--ui-control-bg);
+      --field-line: var(--ui-control-border);
+      --accent: var(--ui-surface-selected);
+      --accent-strong: var(--ui-focus);
+      --button: var(--vscode-button-background);
     }
 
     * {
@@ -201,16 +202,18 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
     body {
       height: 100%;
       margin: 0;
+      overflow: hidden;
       color: var(--text);
       background: var(--bg);
       font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-      font-size: 14px;
+      font-size: var(--vscode-font-size, 13px);
     }
 
     .window {
       display: grid;
-      grid-template-rows: 46px minmax(0, 1fr) 72px;
-      min-height: 100vh;
+      grid-template-rows: 44px minmax(0, 1fr) 52px;
+      height: 100vh;
+      min-height: 0;
     }
 
     .titlebar {
@@ -219,9 +222,10 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
       gap: 14px;
       min-width: 0;
       padding: 0 18px;
-      border-bottom: 1px solid #25282d;
+      border-bottom: 1px solid var(--line);
       color: var(--muted);
-      font-size: 15px;
+      background: var(--vscode-editorGroupHeader-tabsBackground, var(--bg));
+      font-size: 14px;
       font-weight: 700;
     }
 
@@ -244,14 +248,16 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
 
     .content {
       display: grid;
-      grid-template-columns: 310px minmax(0, 1fr);
+      grid-template-columns: clamp(240px, 24vw, 280px) minmax(0, 1fr);
       min-height: 0;
+      overflow: hidden;
     }
 
     .sidebar {
       overflow-y: auto;
       padding: 16px 12px;
-      border-right: 1px solid #282c32;
+      border-right: 1px solid var(--line);
+      background: var(--ui-surface);
     }
 
     .group-title {
@@ -286,7 +292,7 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
       gap: 10px;
       width: 100%;
       min-height: 34px;
-      padding: 6px 12px 6px 54px;
+      padding: 6px 12px;
       color: var(--muted);
       background: transparent;
       border: 0;
@@ -297,11 +303,11 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
 
     .nav-item:hover {
       color: var(--text);
-      background: #24272d;
+      background: var(--ui-surface-hover);
     }
 
     .nav-item.active {
-      color: var(--text);
+      color: var(--ui-text-selected);
       background: var(--accent);
     }
 
@@ -320,7 +326,7 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
     }
 
     .nav-detail {
-      color: #b6bbc5;
+      color: var(--muted);
       font-size: 12px;
     }
 
@@ -328,9 +334,9 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
       min-width: 24px;
       height: 20px;
       padding: 1px 7px;
-      color: #dbe6ff;
-      background: #263852;
-      border: 1px solid #3b5680;
+      color: var(--vscode-badge-foreground);
+      background: var(--vscode-badge-background);
+      border: 1px solid var(--line);
       border-radius: 10px;
       font-size: 12px;
       line-height: 16px;
@@ -382,7 +388,7 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
       min-height: 28px;
       padding: 4px 10px;
       color: var(--text);
-      background: #24272d;
+      background: var(--vscode-button-secondaryBackground);
       border: 1px solid var(--field-line);
       border-radius: 4px;
       font: inherit;
@@ -390,8 +396,9 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
     }
 
     .action-button:hover {
-      background: #2b3037;
-      border-color: #58606c;
+      color: var(--vscode-button-secondaryForeground);
+      background: var(--vscode-button-secondaryHoverBackground);
+      border-color: var(--accent-strong);
     }
 
     .table-actions {
@@ -407,7 +414,7 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
 
     .form-row {
       display: grid;
-      grid-template-columns: 230px minmax(260px, 1fr);
+      grid-template-columns: clamp(160px, 20vw, 210px) minmax(0, 1fr);
       align-items: center;
       gap: 14px;
       min-height: 36px;
@@ -472,14 +479,14 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
     .table th,
     .table td {
       padding: 8px 10px;
-      border-bottom: 1px solid #333740;
+      border-bottom: 1px solid var(--line);
       text-align: left;
       vertical-align: top;
     }
 
     .table th {
-      color: #b8bdc8;
-      background: #24272d;
+      color: var(--muted);
+      background: var(--vscode-editorGroupHeader-tabsBackground, var(--ui-surface));
       font-weight: 600;
     }
 
@@ -500,13 +507,15 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
       align-items: center;
       justify-content: flex-end;
       gap: 14px;
-      padding: 14px 18px;
-      border-top: 1px solid #282c32;
+      min-height: 0;
+      padding: 8px 18px;
+      border-top: 1px solid var(--line);
+      background: var(--vscode-editorGroupHeader-tabsBackground, var(--bg));
     }
 
     .footer button {
       min-width: 96px;
-      min-height: 36px;
+      min-height: 30px;
       color: var(--text);
       background: transparent;
       border: 1px solid var(--field-line);
@@ -515,15 +524,41 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
     }
 
     .footer .primary {
-      color: white;
+      color: var(--vscode-button-foreground);
       background: var(--button);
-      border-color: #6098ff;
-      box-shadow: 0 0 0 2px #102f66;
+      border-color: var(--vscode-button-border, transparent);
     }
 
     .footer .status {
       margin-right: auto;
-      color: #8fbc8f;
+      color: var(--vscode-testing-iconPassed, var(--muted));
+    }
+
+    @media (max-width: 760px) {
+      .content {
+        grid-template-columns: clamp(220px, 34vw, 250px) minmax(0, 1fr);
+      }
+
+      .main {
+        padding: 18px 20px;
+      }
+
+      .form-row {
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
+        gap: 5px;
+        margin-bottom: 12px;
+      }
+
+      .label {
+        text-align: left;
+        font-size: inherit;
+      }
+
+      .table {
+        display: block;
+        overflow-x: auto;
+      }
     }
   </style>
 </head>
