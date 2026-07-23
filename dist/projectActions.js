@@ -475,11 +475,11 @@ class ProjectActions {
             if (!migrationName) {
                 return;
             }
-            this.terminalRunner.runCommand(`dotnet ef migrations add ${(0, terminalRunner_1.quoteForShell)((0, terminalRunner_1.assertValidMigrationName)(migrationName.trim()))} --project ${(0, terminalRunner_1.quoteForShell)(project.path)}`);
+            this.terminalRunner.runCommand(`dotnet ef migrations add ${(0, terminalRunner_1.quoteForShell)((0, terminalRunner_1.assertValidMigrationName)(migrationName.trim()))} --project ${(0, terminalRunner_1.quoteForShell)(project.path)}`, { onComplete: () => { void this.refresh({ userVisible: false }); } });
             return;
         }
         if (action === 'removeMigration') {
-            this.terminalRunner.runCommand(`dotnet ef migrations remove --project ${(0, terminalRunner_1.quoteForShell)(project.path)}`);
+            this.terminalRunner.runCommand(`dotnet ef migrations remove --project ${(0, terminalRunner_1.quoteForShell)(project.path)}`, { onComplete: () => { void this.refresh({ userVisible: false }); } });
             return;
         }
         if (action === 'updateDatabase') {

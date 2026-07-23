@@ -550,12 +550,18 @@ class ProjectActions {
         return;
       }
 
-      this.terminalRunner.runCommand(`dotnet ef migrations add ${quoteForShell(assertValidMigrationName(migrationName.trim()))} --project ${quoteForShell(project.path)}`);
+      this.terminalRunner.runCommand(
+        `dotnet ef migrations add ${quoteForShell(assertValidMigrationName(migrationName.trim()))} --project ${quoteForShell(project.path)}`,
+        { onComplete: () => { void this.refresh({ userVisible: false }); } }
+      );
       return;
     }
 
     if (action === 'removeMigration') {
-      this.terminalRunner.runCommand(`dotnet ef migrations remove --project ${quoteForShell(project.path)}`);
+      this.terminalRunner.runCommand(
+        `dotnet ef migrations remove --project ${quoteForShell(project.path)}`,
+        { onComplete: () => { void this.refresh({ userVisible: false }); } }
+      );
       return;
     }
 

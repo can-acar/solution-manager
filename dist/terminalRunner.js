@@ -44,18 +44,36 @@ class TerminalRunner {
     constructor() {
         this.terminal = undefined;
     }
-    run(action, item) {
+    run(action, item, options) {
         if (!item || !item.path) {
             throw new Error('A solution or project path is required.');
         }
         const command = `dotnet ${action} ${quoteForShell(item.path)}`;
-        this.runCommand(command);
+        this.runCommand(command, options);
         return command;
     }
-    runCommand(command) {
-        this.getTerminal().show();
-        this.getTerminal().sendText(command);
+    runCommand(command, options) {
+        const terminal = this.getTerminal();
+        terminal.show();
+        const onComplete = typeof options?.onComplete === 'function' ? options.onComplete : undefined;
+        void this.dispatchCommand(terminal, command, onComplete);
         return command;
+    }
+    async dispatchCommand(terminal, command, onComplete) {
+        const integration = await waitForShellIntegration(terminal);
+        if (integration) {
+            const execution = integration.executeCommand(command);
+            if (onComplete) {
+                const subscription = vscode.window.onDidEndTerminalShellExecution((event) => {
+                    if (event.execution === execution) {
+                        subscription.dispose();
+                        onComplete(event.exitCode);
+                    }
+                });
+            }
+            return;
+        }
+        terminal.sendText(command);
     }
     getTerminal() {
         if (!this.terminal || this.terminal.exitStatus) {
@@ -67,6 +85,24 @@ class TerminalRunner {
     }
 }
 exports.TerminalRunner = TerminalRunner;
+function waitForShellIntegration(terminal, timeoutMs = 2000) {
+    if (terminal.shellIntegration) {
+        return Promise.resolve(terminal.shellIntegration);
+    }
+    return new Promise((resolve) => {
+        const subscription = vscode.window.onDidChangeTerminalShellIntegration((event) => {
+            if (event.terminal === terminal && terminal.shellIntegration) {
+                clearTimeout(timer);
+                subscription.dispose();
+                resolve(terminal.shellIntegration);
+            }
+        });
+        const timer = setTimeout(() => {
+            subscription.dispose();
+            resolve(terminal.shellIntegration);
+        }, timeoutMs);
+    });
+}
 function quoteForShell(value) {
     if (process.platform === 'win32') {
         if (/[`"$%\r\n]/.test(value)) {

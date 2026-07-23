@@ -153,13 +153,17 @@ class NuGetManagerView {
     await this.postState();
   }
 
+  private async syncPanelState(requestId?: string): Promise<void> {
+    await this.refresh({ userVisible: false });
+    const state = await this.getState();
+    this.projects = mergeFreshProjectMetadata(this.projects, state);
+    await this.postState(requestId);
+  }
+
   private async handleMessage(message: NuGetManagerMessage): Promise<void> {
     try {
       if (message.type === 'ready' || message.type === 'refresh') {
-        await this.refresh({ userVisible: false });
-        const state = await this.getState();
-        this.projects = mergeFreshProjectMetadata(this.projects, state);
-        await this.postState(message.requestId);
+        await this.syncPanelState(message.requestId);
         return;
       }
 
@@ -229,15 +233,15 @@ class NuGetManagerView {
           const versionArg = version ? ` --version ${quoteForShell(version)}` : '';
           const sourceArg = message.sourceUrl ? ` --source ${quoteForShell(normalizeSourceForDotnet(message.sourceUrl))}` : '';
           const restoreArg = getSkipRestore() ? ' --no-restore' : '';
-          this.terminalRunner.runCommand(`dotnet add ${quoteForShell(project.path)} package ${quoteForShell(packageId)}${versionArg}${sourceArg}${restoreArg}`);
+          this.terminalRunner.runCommand(
+            `dotnet add ${quoteForShell(project.path)} package ${quoteForShell(packageId)}${versionArg}${sourceArg}${restoreArg}`,
+            { onComplete: () => { void this.syncPanelState(); } }
+          );
           commandCount += 1;
         }
 
         if (updatedInProjectFiles > 0) {
-          await this.refresh({ userVisible: false });
-          const state = await this.getState();
-          this.projects = mergeFreshProjectMetadata(this.projects, state);
-          await this.postState(message.requestId);
+          await this.syncPanelState(message.requestId);
         }
 
         const fileMessage = updatedInProjectFiles > 0 ? `${updatedInProjectFiles} project file update${updatedInProjectFiles === 1 ? '' : 's'}` : '';
@@ -269,16 +273,16 @@ class NuGetManagerView {
             }]);
             removedFromProjectFiles += 1;
           } catch {
-            this.terminalRunner.runCommand(`dotnet remove ${quoteForShell(project.path)} package ${quoteForShell(packageId)}`);
+            this.terminalRunner.runCommand(
+              `dotnet remove ${quoteForShell(project.path)} package ${quoteForShell(packageId)}`,
+              { onComplete: () => { void this.syncPanelState(); } }
+            );
             terminalRemovals += 1;
           }
         }
 
         if (removedFromProjectFiles > 0) {
-          await this.refresh({ userVisible: false });
-          const state = await this.getState();
-          this.projects = mergeFreshProjectMetadata(this.projects, state);
-          await this.postState(message.requestId);
+          await this.syncPanelState(message.requestId);
         }
 
         const removedMessage = removedFromProjectFiles > 0
@@ -693,7 +697,7 @@ class NuGetManagerView {
       color: var(--vscode-button-foreground);
       background: var(--vscode-button-background);
       border-color: var(--vscode-button-border, transparent);
-      border-radius: 2px;
+      border-radius: var(--ui-radius);
       padding: 0 10px;
       cursor: pointer;
     }
@@ -743,6 +747,7 @@ class NuGetManagerView {
       align-items: center;
       min-height: 36px;
       padding: 5px 8px 5px 16px;
+      border-radius: var(--ui-radius);
       cursor: default;
     }
     .source-list .source-row {
@@ -760,11 +765,15 @@ class NuGetManagerView {
       flex-wrap: nowrap;
     }
     .row:hover,
-    .project-install-row:hover {
+    .row:focus-visible,
+    .project-install-row:hover,
+    .project-install-row:focus-visible {
+      border-radius: var(--ui-radius);
       background: var(--vscode-list-hoverBackground);
       color: var(--vscode-foreground);
     }
     .row.active {
+      border-radius: var(--ui-radius);
       background: var(--vscode-list-activeSelectionBackground);
       color: var(--vscode-list-activeSelectionForeground);
     }
@@ -780,8 +789,9 @@ class NuGetManagerView {
       padding: 8px 6px 0;
     }
     .package-list .package-row:hover,
-    .package-list .package-row.active {
-      border-radius: 5px;
+    .package-list .package-row.active,
+    .package-list .package-row:focus-visible {
+      border-radius: var(--ui-radius);
     }
     .package-list .package-row {
       grid-template-columns: 22px minmax(0, 1fr) max-content;
@@ -945,6 +955,7 @@ class NuGetManagerView {
       min-height: 34px;
       padding: 6px 8px;
       border-bottom: 1px solid var(--vscode-panel-border);
+      border-radius: var(--ui-radius);
       color: inherit;
       background: transparent;
       cursor: pointer;
@@ -1059,9 +1070,13 @@ class NuGetManagerView {
       min-height: 44px;
       padding: 7px 14px;
       border-bottom: 1px solid var(--vscode-panel-border);
+      border-radius: var(--ui-radius);
       cursor: pointer;
     }
-    .project-choice:hover {
+    .project-choice:hover,
+    .project-choice:focus-within,
+    .project-choice[aria-selected="true"] {
+      border-radius: var(--ui-radius);
       background: var(--vscode-list-hoverBackground);
     }
     .project-choice input {
