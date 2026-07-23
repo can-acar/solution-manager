@@ -53,27 +53,32 @@ class TerminalRunner {
         return command;
     }
     runCommand(command, options) {
-        const terminal = this.getTerminal();
-        terminal.show();
-        const onComplete = typeof options?.onComplete === 'function' ? options.onComplete : undefined;
-        void this.dispatchCommand(terminal, command, onComplete);
+        const onComplete = createOnceCompletion(typeof options?.onComplete === 'function' ? options.onComplete : undefined);
+        void this.dispatchCommand(command, onComplete).catch((error) => {
+            onComplete?.(undefined);
+            const message = error instanceof Error ? error.message : String(error);
+            void vscode.window.showErrorMessage(`Solution Manager: unable to run command. ${message}`);
+        });
         return command;
     }
-    async dispatchCommand(terminal, command, onComplete) {
-        const integration = await waitForShellIntegration(terminal);
-        if (integration) {
-            const execution = integration.executeCommand(command);
-            if (onComplete) {
-                const subscription = vscode.window.onDidEndTerminalShellExecution((event) => {
-                    if (event.execution === execution) {
-                        subscription.dispose();
-                        onComplete(event.exitCode);
-                    }
-                });
+    async dispatchCommand(command, onComplete) {
+        const windowWithShellIntegration = vscode.window;
+        if (typeof windowWithShellIntegration.onDidChangeTerminalShellIntegration === 'function'
+            && typeof windowWithShellIntegration.onDidEndTerminalShellExecution === 'function') {
+            const hadReusableTerminal = Boolean(this.terminal && !this.terminal.exitStatus);
+            const terminal = this.getTerminal();
+            const integration = await waitForShellIntegration(terminal, windowWithShellIntegration);
+            if (integration) {
+                terminal.show();
+                executeWithShellIntegration(integration, command, windowWithShellIntegration.onDidEndTerminalShellExecution.bind(windowWithShellIntegration), onComplete);
+                return;
             }
-            return;
+            if (!hadReusableTerminal && this.terminal === terminal) {
+                terminal.dispose();
+                this.terminal = undefined;
+            }
         }
-        terminal.sendText(command);
+        await executeAsTask(command, onComplete);
     }
     getTerminal() {
         if (!this.terminal || this.terminal.exitStatus) {
@@ -85,21 +90,105 @@ class TerminalRunner {
     }
 }
 exports.TerminalRunner = TerminalRunner;
-function waitForShellIntegration(terminal, timeoutMs = 2000) {
-    if (terminal.shellIntegration) {
-        return Promise.resolve(terminal.shellIntegration);
+function executeWithShellIntegration(integration, command, onDidEndExecution, onComplete) {
+    let execution;
+    const subscription = onComplete
+        ? onDidEndExecution((event) => {
+            if (execution && event.execution === execution) {
+                subscription?.dispose();
+                onComplete(event.exitCode);
+            }
+        })
+        : undefined;
+    try {
+        execution = integration.executeCommand(command);
     }
-    return new Promise((resolve) => {
-        const subscription = vscode.window.onDidChangeTerminalShellIntegration((event) => {
-            if (event.terminal === terminal && terminal.shellIntegration) {
-                clearTimeout(timer);
-                subscription.dispose();
-                resolve(terminal.shellIntegration);
+    catch (error) {
+        subscription?.dispose();
+        throw error;
+    }
+}
+async function executeAsTask(command, onComplete) {
+    const task = new vscode.Task({ type: 'solutionManager.command' }, vscode.TaskScope.Workspace, 'Command', 'Solution Manager', new vscode.ShellExecution(command));
+    task.presentationOptions = {
+        reveal: vscode.TaskRevealKind.Always,
+        panel: vscode.TaskPanelKind.Shared,
+        focus: false,
+        clear: false
+    };
+    let taskExecution;
+    let processSubscription;
+    let taskSubscription;
+    let taskEndTimer;
+    const disposeSubscriptions = () => {
+        processSubscription?.dispose();
+        taskSubscription?.dispose();
+        if (taskEndTimer) {
+            clearTimeout(taskEndTimer);
+            taskEndTimer = undefined;
+        }
+    };
+    const isTargetExecution = (execution) => (execution === taskExecution || execution.task === task);
+    const completeTask = (exitCode) => {
+        disposeSubscriptions();
+        onComplete?.(exitCode);
+    };
+    if (onComplete) {
+        processSubscription = vscode.tasks.onDidEndTaskProcess((event) => {
+            if (isTargetExecution(event.execution)) {
+                completeTask(event.exitCode);
             }
         });
-        const timer = setTimeout(() => {
+        taskSubscription = vscode.tasks.onDidEndTask((event) => {
+            if (isTargetExecution(event.execution)) {
+                taskEndTimer = setTimeout(() => completeTask(undefined), 0);
+            }
+        });
+    }
+    try {
+        taskExecution = await vscode.tasks.executeTask(task);
+    }
+    catch (error) {
+        disposeSubscriptions();
+        throw error;
+    }
+}
+function createOnceCompletion(onComplete) {
+    if (!onComplete) {
+        return undefined;
+    }
+    let completed = false;
+    return (exitCode) => {
+        if (completed) {
+            return;
+        }
+        completed = true;
+        onComplete(exitCode);
+    };
+}
+function waitForShellIntegration(terminal, windowWithShellIntegration, timeoutMs = 2000) {
+    const terminalWithShellIntegration = terminal;
+    if (terminalWithShellIntegration.shellIntegration) {
+        return Promise.resolve(terminalWithShellIntegration.shellIntegration);
+    }
+    const onDidChangeShellIntegration = windowWithShellIntegration.onDidChangeTerminalShellIntegration;
+    if (typeof onDidChangeShellIntegration !== 'function') {
+        return Promise.resolve(undefined);
+    }
+    return new Promise((resolve) => {
+        let timer;
+        const subscription = onDidChangeShellIntegration.call(windowWithShellIntegration, (event) => {
+            if (event.terminal === terminal && terminalWithShellIntegration.shellIntegration) {
+                if (timer) {
+                    clearTimeout(timer);
+                }
+                subscription.dispose();
+                resolve(terminalWithShellIntegration.shellIntegration);
+            }
+        });
+        timer = setTimeout(() => {
             subscription.dispose();
-            resolve(terminal.shellIntegration);
+            resolve(terminalWithShellIntegration.shellIntegration);
         }, timeoutMs);
     });
 }

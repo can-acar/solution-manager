@@ -25,7 +25,7 @@ function getWebviewUiStyles(): string {
       --ui-control-fg: var(--vscode-input-foreground);
       --ui-control-border: var(--vscode-input-border, var(--ui-border));
       --ui-focus: var(--vscode-focusBorder);
-      --ui-radius: 3px;
+      --ui-radius: 5px;
       --ui-control-height: 28px;
       --ui-space-1: 4px;
       --ui-space-2: 8px;
@@ -49,6 +49,15 @@ function getWebviewUiStyles(): string {
     select,
     textarea {
       font: inherit;
+    }
+
+    button,
+    button:hover,
+    button:focus-visible,
+    button[aria-selected="true"],
+    button[aria-pressed="true"],
+    button.active {
+      border-radius: var(--ui-radius);
     }
 
     button:focus-visible,

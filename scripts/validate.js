@@ -55,6 +55,7 @@ async function main() {
   }
 
   validateManifest();
+  await validateTerminalRunner();
   validateProjectAssetsParser();
   validateNuGetManagerView();
   validateDependencyPackagePathResolution();
@@ -74,6 +75,7 @@ function validateManifest() {
   const extensionSource = fs.readFileSync(path.join(process.cwd(), 'src/extension.ts'), 'utf8');
   const activityIcon = fs.readFileSync(path.join(process.cwd(), 'media/activity-icon.svg'), 'utf8');
   const solutionTreeSource = fs.readFileSync(path.join(process.cwd(), 'src/solutionTreeProvider.ts'), 'utf8');
+  const webviewUiSource = fs.readFileSync(path.join(process.cwd(), 'src/webviewUi.ts'), 'utf8');
   const contributedCommands = new Set(packageJson.contributes.commands.map((command) => command.command));
   const registeredCommands = new Set([...extensionSource.matchAll(/registerCommand\('([^']+)'/g)].map((match) => match[1]));
   const missingRegistrations = [...contributedCommands].filter((command) => !registeredCommands.has(command));
@@ -126,6 +128,9 @@ function validateManifest() {
   assert(!activityIcon.includes('linearGradient'), 'Activity Bar icon must remain monochrome.');
   assert(solutionTreeSource.includes("case 'solution':\n      return new vscode.ThemeIcon('symbol-namespace');"), 'Solution tree does not use a semantic solution Codicon.');
   assert(solutionTreeSource.includes("case 'project':\n      return new vscode.ThemeIcon('symbol-class');"), 'Solution tree does not use a distinct semantic project Codicon.');
+  assert(webviewUiSource.includes('--ui-radius: 5px;'), 'Shared webview button radius is not 5px.');
+  assert(webviewUiSource.includes('button:hover'), 'Shared webview button hover radius contract is missing.');
+  assert(packageJson.devDependencies['@types/vscode'] === '1.90.0', 'VS Code types must be pinned to the advertised minimum engine version.');
   assert(
     hasMenuSubmenu(viewItemMenus, 'solutionManager.solution.add', 'solution'),
     'Solution root does not expose Add submenu.'
@@ -270,6 +275,166 @@ function hasMenuSubmenu(entries, submenu, contextValue) {
 
 function runtimeModulePath(fileName) {
   return path.join(process.cwd(), 'dist', fileName);
+}
+
+async function validateTerminalRunner() {
+  const originalLoad = Module._load;
+  const terminalRunnerPath = runtimeModulePath('terminalRunner.js');
+  const processListeners = new Set();
+  const taskListeners = new Set();
+  const shellExecutionListeners = new Set();
+  let executedTask;
+  let taskExecutionCount = 0;
+  let terminalCreationCount = 0;
+  let terminalShowCount = 0;
+  let lastError;
+
+  class Task {
+    constructor(definition, scope, name, source, execution) {
+      this.definition = definition;
+      this.scope = scope;
+      this.name = name;
+      this.source = source;
+      this.execution = execution;
+      this.presentationOptions = undefined;
+    }
+  }
+
+  class ShellExecution {
+    constructor(commandLine) {
+      this.commandLine = commandLine;
+    }
+  }
+
+  const subscribe = (listeners, listener) => {
+    listeners.add(listener);
+    return {
+      dispose: () => listeners.delete(listener)
+    };
+  };
+  const vscodeMock = {
+    Task,
+    ShellExecution,
+    TaskScope: {
+      Workspace: 1
+    },
+    TaskRevealKind: {
+      Always: 1
+    },
+    TaskPanelKind: {
+      Shared: 1
+    },
+    tasks: {
+      onDidEndTaskProcess: (listener) => subscribe(processListeners, listener),
+      onDidEndTask: (listener) => subscribe(taskListeners, listener),
+      executeTask: async (task) => {
+        taskExecutionCount += 1;
+        executedTask = task;
+        const execution = { task };
+
+        queueMicrotask(() => {
+          for (const listener of [...taskListeners]) {
+            listener({ execution });
+          }
+
+          for (const listener of [...processListeners]) {
+            listener({ execution, exitCode: 0 });
+          }
+        });
+
+        return execution;
+      }
+    },
+    window: {
+      createTerminal: () => {
+        terminalCreationCount += 1;
+        throw new Error('The legacy fallback must not create an unused terminal.');
+      },
+      showErrorMessage: (message) => {
+        lastError = message;
+      }
+    }
+  };
+
+  Module._load = function loadWithVscodeMock(request, parent, isMain) {
+    if (request === 'vscode') {
+      return vscodeMock;
+    }
+
+    return originalLoad.call(this, request, parent, isMain);
+  };
+
+  delete require.cache[terminalRunnerPath];
+
+  try {
+    const { TerminalRunner } = require(terminalRunnerPath);
+    const terminalRunner = new TerminalRunner();
+    let fallbackCompletionCount = 0;
+    const fallbackExitCode = await new Promise((resolve) => {
+      terminalRunner.runCommand('dotnet --info', {
+        onComplete: (exitCode) => {
+          fallbackCompletionCount += 1;
+          resolve(exitCode);
+        }
+      });
+    });
+
+    assert(fallbackExitCode === 0, 'Task fallback did not forward the process exit code.');
+    assert(fallbackCompletionCount === 1, 'Task fallback completion was not delivered exactly once.');
+    assert(taskExecutionCount === 1, 'Task fallback was not used when Shell Integration capabilities were absent.');
+    assert(terminalCreationCount === 0, 'Task fallback created an unused integrated terminal.');
+    assert(executedTask.execution.commandLine === 'dotnet --info', 'Task fallback did not preserve the command line.');
+    assert(executedTask.source === 'Solution Manager', 'Task fallback does not expose a stable terminal source.');
+    assert(executedTask.presentationOptions.panel === vscodeMock.TaskPanelKind.Shared, 'Task fallback does not reuse its visible terminal panel.');
+
+    const shellExecution = {};
+    const terminal = {
+      exitStatus: undefined,
+      show: () => {
+        terminalShowCount += 1;
+      },
+      shellIntegration: {
+        executeCommand: (command) => {
+          assert(command === 'dotnet restore', 'Shell Integration did not preserve the command line.');
+          queueMicrotask(() => {
+            for (const listener of [...shellExecutionListeners]) {
+              listener({ execution: shellExecution, exitCode: 7 });
+            }
+          });
+          return shellExecution;
+        }
+      }
+    };
+
+    vscodeMock.window.createTerminal = () => {
+      terminalCreationCount += 1;
+      return terminal;
+    };
+    vscodeMock.window.onDidChangeTerminalShellIntegration = () => ({
+      dispose: () => {}
+    });
+    vscodeMock.window.onDidEndTerminalShellExecution = (listener) => subscribe(shellExecutionListeners, listener);
+
+    let shellCompletionCount = 0;
+    const shellExitCode = await new Promise((resolve) => {
+      terminalRunner.runCommand('dotnet restore', {
+        onComplete: (exitCode) => {
+          shellCompletionCount += 1;
+          resolve(exitCode);
+        }
+      });
+    });
+
+    assert(shellExitCode === 7, 'Shell Integration did not forward the command exit code.');
+    assert(shellCompletionCount === 1, 'Shell Integration completion was not delivered exactly once.');
+    assert(taskExecutionCount === 1, 'Shell Integration unexpectedly fell back to a task.');
+    assert(terminalCreationCount === 1, 'Shell Integration did not create its dedicated terminal.');
+    assert(terminalShowCount === 1, 'Shell Integration terminal was not revealed.');
+    assert(!lastError, `Terminal runner reported an unexpected error: ${lastError}`);
+  } finally {
+    delete require.cache[terminalRunnerPath];
+    Module._load = originalLoad;
+  }
 }
 
 function validateProjectAssetsParser() {
@@ -442,6 +607,12 @@ function validateNuGetManagerView() {
     assert(html.includes('title="Resize package details panel"'), 'NuGet Manager splitter affordance was not preserved.');
     assert(html.includes('<svg class="ui-icon"'), 'NuGet Manager actions do not render shared inline SVG icons.');
     assert(!/[↻🗑↗×]/u.test(html), 'NuGet Manager still renders Unicode or emoji action icons.');
+    assert(html.includes('.row:focus-visible'), 'NuGet Manager list items do not preserve radius for keyboard focus.');
+    assert(html.includes('.row:focus-within'), 'NuGet Manager rows do not expose container feedback when a child action receives focus.');
+    assert(html.includes('.row.active'), 'NuGet Manager list items do not preserve radius for selected state.');
+    assert(nugetManagerSource.includes('stateUpdateQueue'), 'NuGet Manager live state updates are not serialized.');
+    assert(nugetManagerSource.includes('drainPanelStateReposts'), 'NuGet Manager live state update bursts are not coalesced.');
+    assert(nugetManagerSource.includes("failed to synchronize NuGet Manager state"), 'NuGet Manager background synchronization errors are not reported.');
     assert(nugetManagerSource.includes('activePackageTab'), 'NuGet Manager does not expose package browse/installed tab state.');
     assert(nugetManagerSource.includes('installed-mode'), 'NuGet Manager does not switch the package layout for installed packages.');
     assert(nugetManagerSource.includes('.packages-page.installed-mode .content-split'), 'NuGet Manager installed layout can collapse into the browse summary grid row.');
@@ -2308,6 +2479,9 @@ function validateProjectPropertiesView() {
     assert(html.includes('@media (max-width: 760px)'), 'Project Properties single-column form breakpoint is missing.');
     assert(html.includes('padding: 6px 12px;'), 'Project Properties navigation still reserves the obsolete icon indent.');
     assert(!html.includes('--bg: #18191c'), 'Project Properties still contains its fixed dark palette.');
+    assert(html.includes('.table tbody tr:hover > td:first-child'), 'Project Properties list rows do not render rounded hover edges.');
+    assert(html.includes('border-collapse: separate'), 'Project Properties table still uses the collapsed border model that ignores row radii.');
+    assert(html.includes('border-spacing: 0'), 'Project Properties separate border model introduces unintended cell spacing.');
     assert(configurations.some((item) => item.label === 'Staging | x64'), 'Custom configuration was not exposed to the properties view.');
     assert(configurations.some((item) => item.label === 'Debug | AnyCPU'), 'Debug fallback configuration was not exposed.');
     assert(configurations.some((item) => item.label === 'Release | AnyCPU'), 'Release fallback configuration was not exposed.');
@@ -2609,6 +2783,9 @@ function validateSolutionPropertiesView() {
     assert(!html.includes('salt-okunurdur'), 'Solution Properties still contains Turkish UI text.');
     assert(html.includes(' disabled'), 'Solution Properties .slnx controls are not read-only.');
     assert(html.includes('Solution configuration updated.'), 'Solution Properties notice surface was not rendered.');
+    assert(html.includes('tbody tr:hover > td:first-child'), 'Solution Properties rows do not render rounded hover edges.');
+    assert(html.includes('border-collapse: separate'), 'Solution Properties table still uses the collapsed border model that ignores row radii.');
+    assert(html.includes('border-spacing: 0'), 'Solution Properties separate border model introduces unintended cell spacing.');
   } finally {
     Module._load = originalLoad;
   }

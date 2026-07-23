@@ -162,7 +162,8 @@ function getSolutionPropertiesHtml(solution, model, selectedConfiguration, nonce
     table {
       width: 100%;
       min-width: 760px;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
     }
     th,
     td {
@@ -176,8 +177,23 @@ function getSolutionPropertiesHtml(solution, model, selectedConfiguration, nonce
       font-weight: 600;
       white-space: nowrap;
     }
-    tbody tr:hover {
+    tbody tr:hover > td,
+    tbody tr:focus-within > td {
       background: var(--ui-surface-hover);
+    }
+    tbody tr[aria-selected="true"] > td {
+      color: var(--ui-text-selected);
+      background: var(--ui-surface-selected);
+    }
+    tbody tr:hover > td:first-child,
+    tbody tr:focus-within > td:first-child,
+    tbody tr[aria-selected="true"] > td:first-child {
+      border-radius: var(--ui-radius) 0 0 var(--ui-radius);
+    }
+    tbody tr:hover > td:last-child,
+    tbody tr:focus-within > td:last-child,
+    tbody tr[aria-selected="true"] > td:last-child {
+      border-radius: 0 var(--ui-radius) var(--ui-radius) 0;
     }
     tbody tr:last-child td {
       border-bottom: 0;

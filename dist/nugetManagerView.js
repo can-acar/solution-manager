@@ -59,6 +59,9 @@ class NuGetManagerView {
     projects = [];
     stateSubscription;
     protocolHost;
+    stateUpdateQueue = Promise.resolve();
+    repostRequested = false;
+    repostLoop;
     constructor(context, terminalRunner, getState, refresh, onDidChangeState) {
         this.context = context;
         this.terminalRunner = terminalRunner;
@@ -82,31 +85,71 @@ class NuGetManagerView {
             this.panel.onDidDispose(() => {
                 this.stateSubscription?.dispose();
                 this.stateSubscription = undefined;
+                this.repostRequested = false;
                 this.panel = undefined;
             }, undefined, this.context.subscriptions);
             this.panel.webview.onDidReceiveMessage((message) => this.handleMessage(message), undefined, this.context.subscriptions);
             if (this.onDidChangeState) {
-                this.stateSubscription = this.onDidChangeState(() => { void this.repostPanelState(); });
+                this.stateSubscription = this.onDidChangeState(() => this.schedulePanelStateRepost());
             }
         }
         this.panel.title = 'NuGet Manager';
         this.panel.webview.html = this.createHtml(this.panel.webview);
         this.panel.reveal();
-        await this.postState();
+        await this.enqueuePanelStateUpdate();
     }
     async syncPanelState(requestId) {
-        await this.refresh({ userVisible: false });
-        const state = await this.getState();
-        this.projects = mergeFreshProjectMetadata(this.projects, state);
-        await this.postState(requestId);
+        await this.enqueuePanelStateUpdate({
+            refresh: true,
+            requestId
+        });
     }
-    async repostPanelState() {
-        if (!this.panel) {
+    schedulePanelStateRepost() {
+        this.repostRequested = true;
+        if (this.repostLoop) {
             return;
         }
-        const state = await this.getState();
-        this.projects = mergeFreshProjectMetadata(this.projects, state);
-        await this.postState();
+        const repostLoop = this.drainPanelStateReposts();
+        this.repostLoop = repostLoop;
+        void repostLoop
+            .catch((error) => {
+            const message = error instanceof Error ? error.message : String(error);
+            console.error('Solution Manager: failed to synchronize NuGet Manager state.', error);
+            void vscode.window.showErrorMessage(`Solution Manager: failed to synchronize NuGet Manager state. ${message}`);
+        })
+            .finally(() => {
+            if (this.repostLoop === repostLoop) {
+                this.repostLoop = undefined;
+            }
+            if (this.repostRequested && this.panel) {
+                this.schedulePanelStateRepost();
+            }
+        });
+    }
+    async drainPanelStateReposts() {
+        while (this.repostRequested && this.panel) {
+            this.repostRequested = false;
+            await this.enqueuePanelStateUpdate();
+        }
+    }
+    enqueuePanelStateUpdate(options = {}) {
+        const update = this.stateUpdateQueue.then(async () => {
+            const panel = this.panel;
+            if (!panel) {
+                return;
+            }
+            if (options.refresh) {
+                await this.refresh({ userVisible: false });
+            }
+            const state = await this.getState();
+            if (this.panel !== panel) {
+                return;
+            }
+            this.projects = mergeFreshProjectMetadata(this.projects, state);
+            await this.postState(options.requestId);
+        });
+        this.stateUpdateQueue = update.catch(() => undefined);
+        return update;
     }
     async handleMessage(message) {
         try {
@@ -663,8 +706,10 @@ class NuGetManagerView {
     }
     .row:hover,
     .row:focus-visible,
+    .row:focus-within,
     .project-install-row:hover,
-    .project-install-row:focus-visible {
+    .project-install-row:focus-visible,
+    .project-install-row:focus-within {
       border-radius: var(--ui-radius);
       background: var(--vscode-list-hoverBackground);
       color: var(--vscode-foreground);
@@ -675,7 +720,9 @@ class NuGetManagerView {
       color: var(--vscode-list-activeSelectionForeground);
     }
     .row:focus-visible,
-    .project-install-row:focus-visible {
+    .row:focus-within,
+    .project-install-row:focus-visible,
+    .project-install-row:focus-within {
       position: relative;
       z-index: 1;
     }
@@ -687,7 +734,8 @@ class NuGetManagerView {
     }
     .package-list .package-row:hover,
     .package-list .package-row.active,
-    .package-list .package-row:focus-visible {
+    .package-list .package-row:focus-visible,
+    .package-list .package-row:focus-within {
       border-radius: var(--ui-radius);
     }
     .package-list .package-row {

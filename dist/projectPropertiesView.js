@@ -296,7 +296,7 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
       color: var(--muted);
       background: transparent;
       border: 0;
-      border-radius: 5px;
+      border-radius: var(--ui-radius);
       font: inherit;
       text-align: left;
     }
@@ -390,7 +390,7 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
       color: var(--text);
       background: var(--vscode-button-secondaryBackground);
       border: 1px solid var(--field-line);
-      border-radius: 4px;
+      border-radius: var(--ui-radius);
       font: inherit;
       line-height: 18px;
     }
@@ -468,7 +468,8 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
 
     .table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
       color: var(--text);
       background: var(--field);
       border: 1px solid var(--field-line);
@@ -492,6 +493,28 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
 
     .table tr:last-child td {
       border-bottom: 0;
+    }
+
+    .table tbody tr:hover > td,
+    .table tbody tr:focus-within > td {
+      background: var(--ui-surface-hover);
+    }
+
+    .table tbody tr[aria-selected="true"] > td {
+      color: var(--ui-text-selected);
+      background: var(--ui-surface-selected);
+    }
+
+    .table tbody tr:hover > td:first-child,
+    .table tbody tr:focus-within > td:first-child,
+    .table tbody tr[aria-selected="true"] > td:first-child {
+      border-radius: var(--ui-radius) 0 0 var(--ui-radius);
+    }
+
+    .table tbody tr:hover > td:last-child,
+    .table tbody tr:focus-within > td:last-child,
+    .table tbody tr[aria-selected="true"] > td:last-child {
+      border-radius: 0 var(--ui-radius) var(--ui-radius) 0;
     }
 
     .empty {
@@ -519,7 +542,7 @@ function getProjectPropertiesHtml(project, metadata, nonce, notice = '') {
       color: var(--text);
       background: transparent;
       border: 1px solid var(--field-line);
-      border-radius: 5px;
+      border-radius: var(--ui-radius);
       font: inherit;
     }
 
