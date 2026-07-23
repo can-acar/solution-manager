@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { updateProjectItemReferences } from '#src/projectFileEditor';
 import { NuGetProtocolHost } from '#src/nugetProtocolHost';
+import { getWebviewIcon, getWebviewUiStyles } from '#src/webviewUi';
 import {
   quoteForShell,
   TerminalRunner,
@@ -399,9 +400,9 @@ class NuGetManagerView {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data:; style-src 'unsafe-inline' ${webview.cspSource}; script-src 'nonce-${nonce}';">
   <title>NuGet Manager</title>
-  <style>
+  <style nonce="${nonce}">
+    ${getWebviewUiStyles()}
     :root {
-      color-scheme: dark light;
       font-family: var(--vscode-font-family);
       font-size: var(--vscode-font-size);
       color: var(--vscode-foreground);
@@ -421,25 +422,10 @@ class NuGetManagerView {
     }
     .nuget-shell {
       display: grid;
-      grid-template-rows: 30px 34px 1fr 26px;
+      grid-template-rows: 34px minmax(0, 1fr) 26px;
       height: 100vh;
       min-height: 0;
       background: var(--vscode-editor-background);
-    }
-    .titlebar {
-      display: flex;
-      align-items: center;
-      padding: 0 16px;
-      border-bottom: 1px solid var(--vscode-panel-border);
-      background: var(--vscode-editorGroupHeader-tabsBackground);
-    }
-    .title-caption {
-      display: flex;
-      align-items: center;
-      color: var(--vscode-descriptionForeground);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .3px;
     }
     .main-tabs,
     .sub-tabs {
@@ -465,6 +451,9 @@ class NuGetManagerView {
       color: var(--vscode-foreground);
       border-bottom-color: var(--vscode-focusBorder);
     }
+    .tab-button:hover:not(.active) {
+      color: var(--vscode-foreground);
+    }
     .page {
       height: 100%;
       min-height: 0;
@@ -477,7 +466,7 @@ class NuGetManagerView {
     }
     .packages-page {
       display: grid;
-      grid-template-rows: 42px 38px minmax(0, 1fr);
+      grid-template-rows: 44px minmax(0, 1fr);
       height: 100%;
       min-height: 0;
       overflow: hidden;
@@ -485,7 +474,8 @@ class NuGetManagerView {
     .package-toolbar {
       display: grid;
       grid-row: 1;
-      grid-template-columns: minmax(320px, 1fr) 28px max-content minmax(130px, 160px) max-content max-content;
+      grid-template-areas: "search refresh clear project source prerelease action";
+      grid-template-columns: minmax(260px, 1fr) 28px 28px minmax(132px, 200px) minmax(132px, 200px) max-content 80px;
       gap: 8px;
       align-items: center;
       padding: 8px 14px;
@@ -493,12 +483,34 @@ class NuGetManagerView {
       background: var(--vscode-editor-background);
     }
     #projectSelect {
-      width: auto;
-      min-width: 132px;
-      max-width: 320px;
+      grid-area: project;
+      width: 100%;
+      min-width: 0;
+    }
+    #sourceSelect {
+      grid-area: source;
+      width: 100%;
+      min-width: 0;
+    }
+    #refreshButton {
+      grid-area: refresh;
+    }
+    #clearCacheButton {
+      grid-area: clear;
+    }
+    #prereleaseInput {
+      flex: 0 0 auto;
+    }
+    .package-toolbar .checkbox-row {
+      grid-area: prerelease;
+    }
+    #searchButton {
+      grid-area: action;
+      min-width: 80px;
     }
     .search-box {
       display: grid;
+      grid-area: search;
       grid-template-columns: 24px 1fr;
       align-items: center;
       height: 28px;
@@ -508,50 +520,52 @@ class NuGetManagerView {
     .search-icon {
       display: flex;
       position: relative;
+      align-items: center;
       justify-content: center;
       color: var(--vscode-descriptionForeground);
     }
     .search-icon::before {
       content: "";
-      width: 11px;
-      height: 11px;
+      box-sizing: border-box;
+      width: 10px;
+      height: 10px;
       border: 1.5px solid currentColor;
       border-radius: 50%;
+      transform: translate(-1px, -1px);
     }
     .search-icon::after {
       content: "";
       position: absolute;
-      width: 6px;
+      top: 50%;
+      left: 50%;
+      width: 5px;
       height: 1.5px;
-      right: 5px;
-      bottom: 7px;
+      border-radius: 1px;
       background: currentColor;
-      transform: rotate(-45deg);
-      transform-origin: center;
+      transform: translate(1px, 1px) rotate(45deg);
+      transform-origin: left center;
     }
     .browse-summary {
-      display: flex;
-      grid-row: 2;
-      align-items: center;
       min-width: 0;
-      padding: 0 16px;
-      border-bottom: 1px solid var(--vscode-panel-border);
-      background: var(--vscode-editor-background);
-      color: var(--vscode-foreground);
-      font-size: 15px;
-      font-style: italic;
-      font-weight: 700;
+      margin-left: auto;
+      overflow: hidden;
+      min-width: 0;
+      color: var(--vscode-descriptionForeground);
+      font-size: 12px;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .content-split {
       display: grid;
-      grid-row: 3;
-      grid-template-columns: minmax(340px, 49%) 8px minmax(320px, 1fr);
+      grid-row: 2;
+      grid-template-columns: minmax(240px, 49%) 8px minmax(240px, 1fr);
       min-height: 0;
       height: 100%;
       overflow: hidden;
     }
     .packages-page.installed-mode {
-      grid-template-rows: 42px minmax(0, 1fr);
+      grid-template-rows: 44px minmax(0, 1fr);
     }
     .packages-page.installed-mode .content-split {
       grid-row: 2;
@@ -589,28 +603,6 @@ class NuGetManagerView {
         var(--vscode-focusBorder) 5px,
         transparent 5px
       );
-    }
-    .splitter::after {
-      content: "< | >";
-      position: absolute;
-      top: 48%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(90deg);
-      padding: 1px 5px;
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 3px;
-      color: var(--vscode-descriptionForeground);
-      background: var(--vscode-editor-background);
-      font-size: 10px;
-      font-weight: 700;
-      line-height: 1.2;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-    }
-    .splitter:hover::after,
-    .splitter.dragging::after {
-      opacity: 1;
     }
     body.resizing,
     body.resizing * {
@@ -680,10 +672,11 @@ class NuGetManagerView {
       align-items: center;
     }
     select, input, button {
-      height: 28px;
+      height: var(--ui-control-height);
       color: var(--vscode-input-foreground);
       background: var(--vscode-input-background);
       border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+      border-radius: var(--ui-radius);
       font: inherit;
     }
     input[type="text"], input:not([type]) {
@@ -700,6 +693,7 @@ class NuGetManagerView {
       color: var(--vscode-button-foreground);
       background: var(--vscode-button-background);
       border-color: var(--vscode-button-border, transparent);
+      border-radius: 2px;
       padding: 0 10px;
       cursor: pointer;
     }
@@ -712,7 +706,6 @@ class NuGetManagerView {
       color: var(--vscode-descriptionForeground);
       background: transparent;
       border-color: transparent;
-      font-size: 16px;
     }
     .icon-button:hover {
       color: var(--vscode-foreground);
@@ -767,15 +760,28 @@ class NuGetManagerView {
       flex-wrap: nowrap;
     }
     .row:hover,
+    .project-install-row:hover {
+      background: var(--vscode-list-hoverBackground);
+      color: var(--vscode-foreground);
+    }
     .row.active {
       background: var(--vscode-list-activeSelectionBackground);
       color: var(--vscode-list-activeSelectionForeground);
+    }
+    .row:focus-visible,
+    .project-install-row:focus-visible {
+      position: relative;
+      z-index: 1;
     }
     .package-list {
       height: 100%;
       min-height: 0;
       overflow: auto;
-      padding-top: 8px;
+      padding: 8px 6px 0;
+    }
+    .package-list .package-row:hover,
+    .package-list .package-row.active {
+      border-radius: 5px;
     }
     .package-list .package-row {
       grid-template-columns: 22px minmax(0, 1fr) max-content;
@@ -830,8 +836,8 @@ class NuGetManagerView {
       width: 18px;
       height: 18px;
       border-radius: 2px;
-      color: #f8fafc;
-      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      color: var(--vscode-badge-foreground);
+      background: var(--vscode-badge-background);
       font-size: 7px;
       font-weight: 800;
       line-height: 1;
@@ -866,7 +872,13 @@ class NuGetManagerView {
     .row:hover .version-chip {
       display: none;
     }
+    .row:focus-within .version-chip {
+      display: none;
+    }
     .row:hover .row-actions {
+      display: flex;
+    }
+    .row:focus-within .row-actions {
       display: flex;
     }
     .actions {
@@ -937,12 +949,6 @@ class NuGetManagerView {
       background: transparent;
       cursor: pointer;
     }
-    .project-install-row:hover,
-    .project-install-row:focus {
-      background: var(--vscode-list-activeSelectionBackground);
-      color: var(--vscode-list-activeSelectionForeground);
-      outline: 0;
-    }
     .project-install-row .pkg-icon {
       width: 16px;
       height: 16px;
@@ -993,7 +999,7 @@ class NuGetManagerView {
       align-items: center;
       justify-content: center;
       padding: 24px;
-      background: rgba(0, 0, 0, .45);
+      background: color-mix(in srgb, var(--vscode-editor-background) 68%, transparent);
     }
     .modal-backdrop.hidden {
       display: none;
@@ -1007,7 +1013,7 @@ class NuGetManagerView {
       border: 1px solid var(--vscode-panel-border);
       border-radius: 6px;
       background: var(--vscode-editor-background);
-      box-shadow: 0 16px 48px rgba(0, 0, 0, .35);
+      box-shadow: 0 16px 48px var(--vscode-widget-shadow, transparent);
       overflow: hidden;
     }
     .project-selection-header,
@@ -1086,18 +1092,24 @@ class NuGetManagerView {
     }
     @media (max-width: 920px) {
       .package-toolbar {
-        grid-template-columns: minmax(160px, 1fr) 28px minmax(140px, 1fr);
-        grid-auto-flow: row;
+        grid-template-areas:
+          "search search refresh clear"
+          "project source prerelease action";
+        grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) max-content 80px;
+        grid-template-rows: repeat(2, var(--ui-control-height));
       }
       .packages-page {
-        grid-template-rows: auto 36px minmax(0, 1fr);
+        grid-template-rows: auto minmax(480px, 1fr);
+        overflow-y: auto;
       }
       .packages-page.installed-mode {
         grid-template-rows: auto minmax(0, 1fr);
       }
       .content-split {
         grid-template-columns: 1fr;
-        grid-template-rows: minmax(220px, 48%) 1fr;
+        grid-template-rows: minmax(240px, 1fr) minmax(240px, 1fr);
+        min-height: 480px;
+        overflow: visible;
       }
       .splitter {
         display: none;
@@ -1107,16 +1119,28 @@ class NuGetManagerView {
         border-bottom: 1px solid var(--vscode-panel-border);
       }
     }
+    @media (max-width: 640px) {
+      .package-toolbar {
+        grid-template-areas:
+          "search search refresh clear"
+          "project project project project"
+          "source source prerelease action";
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) max-content 80px;
+      }
+      .source-editor {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .source-editor-actions {
+        justify-content: flex-start;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="nuget-shell">
-    <header class="titlebar">
-      <div class="title-caption">NUGET</div>
-    </header>
     <nav class="main-tabs" aria-label="NuGet sections">
-      <button id="packagesTabButton" class="tab-button active" type="button">Paketler</button>
-      <button id="sourcesTabButton" class="tab-button" type="button">Kaynaklar</button>
+      <button id="packagesTabButton" class="tab-button active" type="button">Packages</button>
+      <button id="sourcesTabButton" class="tab-button" type="button">Sources</button>
     </nav>
     <section id="packagesView" class="page packages-page">
       <div class="package-toolbar">
@@ -1124,24 +1148,24 @@ class NuGetManagerView {
           <span class="search-icon" aria-hidden="true"></span>
           <input id="queryInput" placeholder="Search NuGet packages" />
         </div>
-        <button id="refreshButton" class="icon-button" title="Refresh" aria-label="Refresh">↻</button>
-        <button id="clearCacheButton" class="icon-button" title="Clear NuGet caches (dotnet nuget locals all --clear)" aria-label="Clear NuGet cache">🗑</button>
+        <button id="refreshButton" class="icon-button" title="Refresh" aria-label="Refresh">${getWebviewIcon('refresh')}</button>
+        <button id="clearCacheButton" class="icon-button" title="Clear NuGet caches (dotnet nuget locals all --clear)" aria-label="Clear NuGet cache">${getWebviewIcon('trash')}</button>
         <select id="projectSelect" title="Project"></select>
         <select id="sourceSelect" title="Package source"></select>
         <label class="checkbox-row"><input id="prereleaseInput" type="checkbox" /> Prerelease</label>
         <button id="searchButton">Search</button>
       </div>
-      <div id="browseSummary" class="browse-summary">Available Packages: Top 100</div>
       <div id="contentSplit" class="content-split">
         <section class="list-pane">
           <div class="sub-tabs" aria-label="Package list mode">
-            <button id="browseTabButton" class="tab-button active" type="button">ARA</button>
-            <button id="installedTabButton" class="tab-button" type="button">YUKLU</button>
+            <button id="browseTabButton" class="tab-button active" type="button">Browse</button>
+            <button id="installedTabButton" class="tab-button" type="button">Installed</button>
+            <span id="browseSummary" class="browse-summary">Available Packages: Top 100</span>
           </div>
           <div id="searchResults" class="list package-list"></div>
           <div id="installedList" class="list package-list hidden"></div>
         </section>
-        <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize package details panel" title="< | >"></div>
+        <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize package details panel" title="Resize package details panel"></div>
         <section class="details-pane">
           <div class="section-title">Details</div>
           <div id="details" class="empty">Select a package to view details.</div>
@@ -1169,7 +1193,7 @@ class NuGetManagerView {
     <section class="project-selection-modal">
       <div class="project-selection-header">
         <div id="projectSelectionTitle" class="project-selection-title">Select projects</div>
-        <button id="projectSelectionClose" class="icon-button project-selection-close" type="button" title="Close" aria-label="Close">×</button>
+        <button id="projectSelectionClose" class="icon-button project-selection-close" type="button" title="Close" aria-label="Close">${getWebviewIcon('close')}</button>
       </div>
       <div class="project-selection-toolbar">
         <button id="projectSelectionSelectAll" class="secondary" type="button">Select all</button>
@@ -1362,12 +1386,21 @@ class NuGetManagerView {
     function renderInstalled() {
       const packages = installedPackages();
       $('installedList').innerHTML = packages.length ? packages.map((pkg) => packageRow(pkg, true)).join('') : '<div class="empty">No PackageReference items found.</div>';
-      document.querySelectorAll('#installedList [data-select-package]').forEach((row) => row.addEventListener('click', () => {
-        const pkg = packages.find((item) => (item.id || item.name) === row.dataset.selectPackage);
-        state.selectedPackage = pkg;
-        state.selectedDetails = { installedOnly: true };
-        renderDetails();
-      }));
+      document.querySelectorAll('#installedList [data-select-package]').forEach((row) => {
+        const selectPackage = () => {
+          const pkg = packages.find((item) => (item.id || item.name) === row.dataset.selectPackage);
+          state.selectedPackage = pkg;
+          state.selectedDetails = { installedOnly: true };
+          setActivePackageRow('installedList', row);
+          renderDetails();
+        };
+        row.addEventListener('click', selectPackage);
+        row.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          selectPackage();
+        });
+      });
       document.querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', (event) => {
         event.stopPropagation();
         runPackageAction('remove', button.dataset.remove);
@@ -1390,15 +1423,30 @@ class NuGetManagerView {
       document.querySelectorAll('[data-remove-source]').forEach((button) => button.addEventListener('click', () => removeSource(button.dataset.removeSource)));
     }
 
+    function setActivePackageRow(listId, activeRow) {
+      document.querySelectorAll('#' + listId + ' [data-select-package]').forEach((row) => {
+        row.classList.toggle('active', row === activeRow);
+      });
+    }
+
     function renderSearchResults() {
       $('searchResults').innerHTML = state.searchResults.length ? state.searchResults.map((pkg) => packageRow(pkg, false)).join('') : '<div class="empty">Search for packages to install.</div>';
-      document.querySelectorAll('#searchResults [data-select-package]').forEach((row) => row.addEventListener('click', () => {
-        const pkg = state.searchResults.find((item) => item.id === row.dataset.selectPackage);
-        state.selectedPackage = pkg;
-        state.selectedDetails = undefined;
-        renderDetails();
-        loadDetails(pkg.id, pkg.version, pkg.sourceUrl);
-      }));
+      document.querySelectorAll('#searchResults [data-select-package]').forEach((row) => {
+        const selectPackage = () => {
+          const pkg = state.searchResults.find((item) => item.id === row.dataset.selectPackage);
+          state.selectedPackage = pkg;
+          state.selectedDetails = undefined;
+          setActivePackageRow('searchResults', row);
+          renderDetails();
+          loadDetails(pkg.id, pkg.version, pkg.sourceUrl);
+        };
+        row.addEventListener('click', selectPackage);
+        row.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          selectPackage();
+        });
+      });
       document.querySelectorAll('[data-install]').forEach((button) => button.addEventListener('click', (event) => {
         event.stopPropagation();
         if (!button.dataset.packageAction) return;
@@ -1474,9 +1522,9 @@ class NuGetManagerView {
         : '';
       const removeTitle = 'Remove ' + packageId + (project.version ? ' ' + project.version : '') + ' from ' + project.name;
       const updateButton = updateAvailable
-        ? '<button class="project-action-button" ' + (project.canUpdate === false ? 'disabled ' : '') + 'data-update-project="' + escapeAttribute(project.path) + '" data-update-package="' + escapeAttribute(packageId) + '" data-update-version="' + escapeAttribute(targetVersion) + '" data-update-source="' + escapeAttribute(sourceUrl || '') + '" title="' + escapeAttribute(project.canUpdate === false ? (project.updateBlockedReason || 'This package reference must be updated manually.') : updateTitle) + '" aria-label="' + escapeAttribute(project.canUpdate === false ? (project.updateBlockedReason || updateTitle) : updateTitle) + '">↗</button>'
+        ? '<button class="project-action-button" ' + (project.canUpdate === false ? 'disabled ' : '') + 'data-update-project="' + escapeAttribute(project.path) + '" data-update-package="' + escapeAttribute(packageId) + '" data-update-version="' + escapeAttribute(targetVersion) + '" data-update-source="' + escapeAttribute(sourceUrl || '') + '" title="' + escapeAttribute(project.canUpdate === false ? (project.updateBlockedReason || 'This package reference must be updated manually.') : updateTitle) + '" aria-label="' + escapeAttribute(project.canUpdate === false ? (project.updateBlockedReason || updateTitle) : updateTitle) + '">${getWebviewIcon('upgrade')}</button>'
         : '';
-      const removeButton = '<button class="project-action-button" data-remove-project="' + escapeAttribute(project.path) + '" data-remove-package="' + escapeAttribute(packageId) + '" title="' + escapeAttribute(removeTitle) + '" aria-label="' + escapeAttribute(removeTitle) + '">×</button>';
+      const removeButton = '<button class="project-action-button" data-remove-project="' + escapeAttribute(project.path) + '" data-remove-package="' + escapeAttribute(packageId) + '" title="' + escapeAttribute(removeTitle) + '" aria-label="' + escapeAttribute(removeTitle) + '">${getWebviewIcon('remove')}</button>';
 
       return '<div class="project-install-row" role="button" tabindex="0" data-open-project="' + escapeAttribute(project.path) + '" title="' + escapeAttribute('Open ' + project.name) + '">' +
         '<span class="pkg-icon">C#</span>' +
@@ -1660,6 +1708,7 @@ class NuGetManagerView {
     function packageRow(pkg, installed) {
       const id = pkg.id || pkg.name;
       const version = pkg.version || pkg.centralVersion || '';
+      const isActive = state.selectedPackage && String(state.selectedPackage.id || state.selectedPackage.name || '').toLowerCase() === String(id || '').toLowerCase();
       const projectMeta = installed && pkg.projectCount ? ' · ' + pkg.projectCount + ' project' + (pkg.projectCount === 1 ? '' : 's') : '';
       const author = pkg.authors ? '<span class="package-author">@' + escapeHtml(pkg.authors) + '</span>' : '';
       const installedMeta = installed ? 'Version: ' + escapeHtml(version || 'multiple') + (pkg.versionSource ? ' · ' + escapeHtml(pkg.versionSource) : '') + projectMeta : 'Latest: ' + escapeHtml(version || '');
@@ -1668,7 +1717,7 @@ class NuGetManagerView {
       const action = installed
         ? '<button class="secondary" data-list="' + escapeAttribute(id) + '">List</button><button data-remove="' + escapeAttribute(id) + '">Remove</button>'
         : renderBrowsePackageAction(id, version);
-      return '<div class="row package-row" data-select-package="' + escapeAttribute(id) + '"><span class="pkg-icon">.NET</span><div class="package-text">' + title + '<div class="meta">' + installedMeta + '</div><div class="desc">' + escapeHtml(pkg.description || '') + '</div></div>' + versionChip + '<div class="row-actions">' + action + '</div></div>';
+      return '<div class="row package-row' + (isActive ? ' active' : '') + '" role="button" tabindex="0" data-select-package="' + escapeAttribute(id) + '"><span class="pkg-icon">.NET</span><div class="package-text">' + title + '<div class="meta">' + installedMeta + '</div><div class="desc">' + escapeHtml(pkg.description || '') + '</div></div>' + versionChip + '<div class="row-actions">' + action + '</div></div>';
     }
 
     function renderBrowsePackageAction(packageId, version) {
@@ -2123,6 +2172,10 @@ class NuGetManagerView {
     }]);
     return true;
   }
+}
+
+function getNuGetManagerHtml(cspSource = 'vscode-webview:'): string {
+  return (NuGetManagerView.prototype as any).createHtml.call({}, { cspSource });
 }
 
 function getProjectsForNode(node: any, state: any): NuGetManagerProject[] {
@@ -2680,6 +2733,7 @@ export {
 const __test = {
   canUpdatePackageReference,
   getPackageSources,
+  getNuGetManagerHtml,
   mapProtocolDependencyGroups,
   mapProtocolPackage
 };
