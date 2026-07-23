@@ -13,6 +13,7 @@ import {
   readSolutionConfigurationModel
 } from '#src/solutionConfigurationEditor';
 import { showSolutionProperties } from '#src/solutionPropertiesView';
+import { SolutionRunProfileManager } from '#src/solutionRunProfile';
 
 const PROJECT_FILE_EXTENSIONS = new Set(['.csproj', '.fsproj', '.vbproj', '.proj']);
 const PROJECT_TEMPLATES = [
@@ -47,10 +48,15 @@ class SolutionActions {
     this.runProjectAction = callbacks.runProjectAction;
     this.getUnloadedProjectUris = callbacks.getUnloadedProjectUris;
     this.setUnloadedProjectUris = callbacks.setUnloadedProjectUris;
+    this.runProfileManager = new SolutionRunProfileManager(context, terminalRunner);
   }
 
   async run(action, node) {
-    const solution = getSolutionItem(node);
+    const solution = await this.resolveSolution(node);
+
+    if (!solution) {
+      return;
+    }
 
     switch (action) {
       case 'addNewProject':
@@ -103,6 +109,27 @@ class SolutionActions {
         break;
       case 'buildSolution':
         this.runDotnetAction(solution, 'build');
+        break;
+      case 'selectRunProfile':
+        await this.runProfileManager.selectProfile(
+          solution,
+          getSolutionProjects(solution),
+          this.getUnloadedProjectUris()
+        );
+        break;
+      case 'runProfile':
+        await this.runProfileManager.run(
+          solution,
+          getSolutionProjects(solution),
+          this.getUnloadedProjectUris()
+        );
+        break;
+      case 'debugProfile':
+        await this.runProfileManager.debug(
+          solution,
+          getSolutionProjects(solution),
+          this.getUnloadedProjectUris()
+        );
         break;
       case 'runMultipleProjects':
         await this.runMultipleProjects(solution);
@@ -172,6 +199,50 @@ class SolutionActions {
       default:
         break;
     }
+  }
+
+  async resolveSolution(node) {
+    if (node?.item?.kind === 'solution') {
+      return node.item;
+    }
+
+    const state = await this.getState();
+    const byPath = new Map();
+
+    for (const solution of [
+      ...(state?.solutions || []),
+      ...(state?.customItems || []).filter((item) => item?.kind === 'solution')
+    ]) {
+      if (solution?.path) {
+        byPath.set(normalizePath(solution.path), solution);
+      }
+    }
+
+    const solutions = [...byPath.values()];
+
+    if (solutions.length === 0) {
+      vscode.window.showInformationMessage('Solution Manager: no solution file is available.');
+      return undefined;
+    }
+
+    if (solutions.length === 1) {
+      return solutions[0];
+    }
+
+    const pick = await vscode.window.showQuickPick(
+      solutions.map((solution) => ({
+        label: solution.name,
+        description: solution.relativePath,
+        detail: solution.path,
+        solution
+      })),
+      {
+        title: 'Solution Manager: Select Solution',
+        placeHolder: 'Select the solution whose Run Profile should be used'
+      }
+    );
+
+    return pick?.solution;
   }
 
   async addNewProject(solution) {
@@ -783,14 +854,6 @@ function collectProjectsWithDependencies(solution, selectedProjects) {
   }
 
   return [...selected.values()];
-}
-
-function getSolutionItem(node) {
-  if (!node || !node.item || node.item.kind !== 'solution') {
-    throw new Error('A solution node is required.');
-  }
-
-  return node.item;
 }
 
 function getSolutionProjects(solution) {

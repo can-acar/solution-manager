@@ -2,6 +2,13 @@ import * as vscode from 'vscode';
 
 type CommandCompletion = (exitCode: number | undefined) => void;
 
+type RunCommandOptions = {
+  onComplete?: CommandCompletion;
+  useTask?: boolean;
+  taskName?: string;
+  dedicatedTask?: boolean;
+};
+
 type TerminalShellExecutionLike = object;
 
 type TerminalShellIntegrationLike = {
@@ -37,7 +44,7 @@ class TerminalRunner {
     this.terminal = undefined;
   }
 
-  run(action: string, item: { path?: string }, options?: { onComplete?: (exitCode: number | undefined) => void }) {
+  run(action: string, item: { path?: string }, options?: RunCommandOptions) {
     if (!item || !item.path) {
       throw new Error('A solution or project path is required.');
     }
@@ -47,12 +54,12 @@ class TerminalRunner {
     return command;
   }
 
-  runCommand(command: string, options?: { onComplete?: (exitCode: number | undefined) => void }) {
+  runCommand(command: string, options?: RunCommandOptions) {
     const onComplete = createOnceCompletion(
       typeof options?.onComplete === 'function' ? options.onComplete : undefined
     );
 
-    void this.dispatchCommand(command, onComplete).catch((error) => {
+    void this.dispatchCommand(command, onComplete, options).catch((error) => {
       onComplete?.(undefined);
       const message = error instanceof Error ? error.message : String(error);
       void vscode.window.showErrorMessage(`Solution Manager: unable to run command. ${message}`);
@@ -63,12 +70,14 @@ class TerminalRunner {
 
   async dispatchCommand(
     command: string,
-    onComplete?: CommandCompletion
+    onComplete?: CommandCompletion,
+    options: RunCommandOptions = {}
   ): Promise<void> {
     const windowWithShellIntegration = vscode.window as WindowWithShellIntegration;
 
     if (
-      typeof windowWithShellIntegration.onDidChangeTerminalShellIntegration === 'function'
+      !options.useTask
+      && typeof windowWithShellIntegration.onDidChangeTerminalShellIntegration === 'function'
       && typeof windowWithShellIntegration.onDidEndTerminalShellExecution === 'function'
     ) {
       const hadReusableTerminal = Boolean(this.terminal && !this.terminal.exitStatus);
@@ -92,7 +101,7 @@ class TerminalRunner {
       }
     }
 
-    await executeAsTask(command, onComplete);
+    await executeAsTask(command, onComplete, options);
   }
 
   getTerminal(): import('vscode').Terminal {
@@ -132,17 +141,23 @@ function executeWithShellIntegration(
   }
 }
 
-async function executeAsTask(command: string, onComplete?: CommandCompletion): Promise<void> {
+async function executeAsTask(
+  command: string,
+  onComplete?: CommandCompletion,
+  options: RunCommandOptions = {}
+): Promise<void> {
   const task = new vscode.Task(
     { type: 'solutionManager.command' },
     vscode.TaskScope.Workspace,
-    'Command',
+    options.taskName || 'Command',
     'Solution Manager',
     new vscode.ShellExecution(command)
   );
   task.presentationOptions = {
     reveal: vscode.TaskRevealKind.Always,
-    panel: vscode.TaskPanelKind.Shared,
+    panel: options.dedicatedTask
+      ? vscode.TaskPanelKind.Dedicated
+      : vscode.TaskPanelKind.Shared,
     focus: false,
     clear: false
   };

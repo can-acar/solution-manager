@@ -98,6 +98,9 @@
     "onCommand:solutionManager.solutionEfUpdateDatabase",
     "onCommand:solutionManager.solutionEfScriptMigration",
     "onCommand:solutionManager.solutionBuild",
+    "onCommand:solutionManager.solutionSelectRunProfile",
+    "onCommand:solutionManager.solutionRun",
+    "onCommand:solutionManager.solutionDebug",
     "onCommand:solutionManager.solutionRunMultipleProjects",
     "onCommand:solutionManager.solutionRunUnitTests",
     "onCommand:solutionManager.solutionPublish",
@@ -763,6 +766,24 @@
         "icon": "$(tools)"
       },
       {
+        "command": "solutionManager.solutionSelectRunProfile",
+        "title": "Select Run Profile...",
+        "category": "Solution Manager",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "solutionManager.solutionRun",
+        "title": "Run Active Profile",
+        "category": "Solution Manager",
+        "icon": "$(run)"
+      },
+      {
+        "command": "solutionManager.solutionDebug",
+        "title": "Debug Active Profile",
+        "category": "Solution Manager",
+        "icon": "$(debug-alt)"
+      },
+      {
         "command": "solutionManager.solutionRunMultipleProjects",
         "title": "Run Multiple Projects...",
         "category": "Solution Manager",
@@ -955,14 +976,29 @@
     "menus": {
       "view/title": [
         {
-          "command": "solutionManager.refresh",
+          "command": "solutionManager.solutionRun",
           "when": "view == solutionManager.solutionView",
           "group": "navigation@1"
         },
         {
-          "command": "solutionManager.addProject",
+          "command": "solutionManager.solutionDebug",
           "when": "view == solutionManager.solutionView",
           "group": "navigation@2"
+        },
+        {
+          "command": "solutionManager.solutionSelectRunProfile",
+          "when": "view == solutionManager.solutionView",
+          "group": "navigation@3"
+        },
+        {
+          "command": "solutionManager.refresh",
+          "when": "view == solutionManager.solutionView",
+          "group": "navigation@4"
+        },
+        {
+          "command": "solutionManager.addProject",
+          "when": "view == solutionManager.solutionView",
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [
@@ -1012,24 +1048,39 @@
           "group": "3_build@1"
         },
         {
-          "command": "solutionManager.solutionRunMultipleProjects",
+          "command": "solutionManager.solutionRun",
           "when": "view == solutionManager.solutionView && viewItem == solution",
           "group": "3_build@2"
         },
         {
-          "command": "solutionManager.solutionRunUnitTests",
+          "command": "solutionManager.solutionDebug",
           "when": "view == solutionManager.solutionView && viewItem == solution",
           "group": "3_build@3"
         },
         {
-          "command": "solutionManager.solutionPublish",
+          "command": "solutionManager.solutionSelectRunProfile",
           "when": "view == solutionManager.solutionView && viewItem == solution",
           "group": "3_build@4"
         },
         {
-          "submenu": "solutionManager.solution.advancedBuild",
+          "command": "solutionManager.solutionRunMultipleProjects",
           "when": "view == solutionManager.solutionView && viewItem == solution",
           "group": "3_build@5"
+        },
+        {
+          "command": "solutionManager.solutionRunUnitTests",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "3_build@6"
+        },
+        {
+          "command": "solutionManager.solutionPublish",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "3_build@7"
+        },
+        {
+          "submenu": "solutionManager.solution.advancedBuild",
+          "when": "view == solutionManager.solutionView && viewItem == solution",
+          "group": "3_build@8"
         },
         {
           "submenu": "solutionManager.solution.git",
@@ -2010,6 +2061,18 @@
         },
         {
           "command": "solutionManager.solutionBuild",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionSelectRunProfile",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionRun",
+          "when": "false"
+        },
+        {
+          "command": "solutionManager.solutionDebug",
           "when": "false"
         },
         {

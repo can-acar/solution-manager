@@ -15,6 +15,7 @@ const files = [
   'dist/solutionActions.js',
   'dist/solutionFileEditor.js',
   'dist/solutionPropertiesView.js',
+  'dist/solutionRunProfile.js',
   'dist/solutionTreeProvider.js',
   'dist/terminalRunner.js',
   'dist/webviewUi.js',
@@ -60,6 +61,7 @@ async function main() {
   validateNuGetManagerView();
   validateDependencyPackagePathResolution();
   validateLaunchSettingsEditor();
+  await validateSolutionRunProfile();
   await validateProjectMetadataParser();
   validateProjectPropertiesView();
   validateSolutionPropertiesView();
@@ -123,6 +125,7 @@ function validateManifest() {
   }
 
   const viewItemMenus = menus['view/item/context'] || [];
+  const viewTitleMenus = menus['view/title'] || [];
 
   assert(activityIcon.includes('currentColor'), 'Activity Bar icon is not theme-aware.');
   assert(!activityIcon.includes('linearGradient'), 'Activity Bar icon must remain monochrome.');
@@ -131,6 +134,18 @@ function validateManifest() {
   assert(webviewUiSource.includes('--ui-radius: 5px;'), 'Shared webview button radius is not 5px.');
   assert(webviewUiSource.includes('button:hover'), 'Shared webview button hover radius contract is missing.');
   assert(packageJson.devDependencies['@types/vscode'] === '1.90.0', 'VS Code types must be pinned to the advertised minimum engine version.');
+  assert(
+    hasMenuCommand(viewTitleMenus, 'solutionManager.solutionRun'),
+    'Solution view toolbar does not expose Run Active Profile.'
+  );
+  assert(
+    hasMenuCommand(viewTitleMenus, 'solutionManager.solutionDebug'),
+    'Solution view toolbar does not expose Debug Active Profile.'
+  );
+  assert(
+    hasMenuCommand(viewTitleMenus, 'solutionManager.solutionSelectRunProfile'),
+    'Solution view toolbar does not expose Select Run Profile.'
+  );
   assert(
     hasMenuSubmenu(viewItemMenus, 'solutionManager.solution.add', 'solution'),
     'Solution root does not expose Add submenu.'
@@ -154,6 +169,18 @@ function validateManifest() {
   assert(
     hasMenuCommand(viewItemMenus, 'solutionManager.solutionBuild', 'solution'),
     'Solution root does not expose Build Solution.'
+  );
+  assert(
+    hasMenuCommand(viewItemMenus, 'solutionManager.solutionRun', 'solution'),
+    'Solution root does not expose Run Active Profile.'
+  );
+  assert(
+    hasMenuCommand(viewItemMenus, 'solutionManager.solutionDebug', 'solution'),
+    'Solution root does not expose Debug Active Profile.'
+  );
+  assert(
+    hasMenuCommand(viewItemMenus, 'solutionManager.solutionSelectRunProfile', 'solution'),
+    'Solution root does not expose Select Run Profile.'
   );
   assert(
     hasMenuCommand(viewItemMenus, 'solutionManager.solutionRunMultipleProjects', 'solution'),
@@ -322,7 +349,8 @@ async function validateTerminalRunner() {
       Always: 1
     },
     TaskPanelKind: {
-      Shared: 1
+      Shared: 1,
+      Dedicated: 2
     },
     tasks: {
       onDidEndTaskProcess: (listener) => subscribe(processListeners, listener),
@@ -431,6 +459,23 @@ async function validateTerminalRunner() {
     assert(terminalCreationCount === 1, 'Shell Integration did not create its dedicated terminal.');
     assert(terminalShowCount === 1, 'Shell Integration terminal was not revealed.');
     assert(!lastError, `Terminal runner reported an unexpected error: ${lastError}`);
+
+    const dedicatedExitCode = await new Promise((resolve) => {
+      terminalRunner.runCommand('dotnet run --project App.csproj', {
+        useTask: true,
+        dedicatedTask: true,
+        taskName: 'Run: App',
+        onComplete: resolve
+      });
+    });
+
+    assert(dedicatedExitCode === 0, 'Dedicated task execution did not forward its exit code.');
+    assert(taskExecutionCount === 2, 'Explicit task execution did not bypass Shell Integration.');
+    assert(executedTask.name === 'Run: App', 'Explicit task execution did not preserve its target name.');
+    assert(
+      executedTask.presentationOptions.panel === vscodeMock.TaskPanelKind.Dedicated,
+      'Concurrent Run Profile targets do not use dedicated terminal panels.'
+    );
   } finally {
     delete require.cache[terminalRunnerPath];
     Module._load = originalLoad;
@@ -1474,6 +1519,162 @@ function validateLaunchSettingsEditor() {
     assert(!withRemovedProfile.profiles['Kivi.Local'], 'Launch profile was not removed.');
     assert(withRemovedProfile.profiles['Kivi.Local 2'], 'Removing one launch profile removed the wrong profile.');
   } finally {
+    Module._load = originalLoad;
+  }
+}
+
+async function validateSolutionRunProfile() {
+  const originalLoad = Module._load;
+  const solutionRunProfilePath = runtimeModulePath('solutionRunProfile.js');
+  const launchSettingsEditorPath = runtimeModulePath('launchSettingsEditor.js');
+  const workspaceState = new Map();
+  const terminalCommands = [];
+  const debugConfigurations = [];
+  const vscodeMock = {
+    Uri: {
+      file: (fsPath) => ({ fsPath })
+    },
+    commands: {
+      executeCommand: async () => {}
+    },
+    debug: {
+      startDebugging: async (_workspaceFolder, configuration) => {
+        debugConfigurations.push(configuration);
+        return true;
+      }
+    },
+    extensions: {
+      getExtension: (id) => id === 'ms-dotnettools.csdevkit' ? { id } : undefined
+    },
+    window: {
+      showErrorMessage: async () => undefined,
+      showInformationMessage: () => {},
+      showWarningMessage: async () => undefined,
+      setStatusBarMessage: () => {},
+      showQuickPick: async (items, options) => (
+        options?.canPickMany
+          ? [items[0]]
+          : items.find((item) => item.profileName === 'https') || items[0]
+      )
+    },
+    workspace: {
+      asRelativePath: (value) => String(value),
+      getWorkspaceFolder: () => ({ name: 'repo' }),
+      fs: {
+        readFile: async () => Buffer.from(JSON.stringify({
+          profiles: {
+            https: {
+              commandName: 'Project',
+              environmentVariables: {
+                ASPNETCORE_ENVIRONMENT: 'Development'
+              }
+            }
+          }
+        }))
+      }
+    }
+  };
+
+  Module._load = function loadWithVscodeMock(request, parent, isMain) {
+    if (request === 'vscode') {
+      return vscodeMock;
+    }
+
+    return originalLoad.call(this, request, parent, isMain);
+  };
+
+  delete require.cache[solutionRunProfilePath];
+  delete require.cache[launchSettingsEditorPath];
+
+  try {
+    const { __test, SolutionRunProfileManager } = require(solutionRunProfilePath);
+    const target = {
+      projectName: 'Sample.Api',
+      projectPath: path.join('/repo', 'src', 'Sample.Api', 'Sample.Api.csproj'),
+      launchProfile: 'https'
+    };
+    const command = __test.createSolutionRunCommand(target);
+    const debugConfiguration = __test.createDotnetDebugConfiguration(target);
+    const profile = __test.normalizeStoredRunProfile({
+      version: 1,
+      solutionPath: path.join('/repo', 'Sample.sln'),
+      name: 'API',
+      targets: [
+        target,
+        {
+          ...target,
+          projectName: 'Duplicate'
+        }
+      ]
+    }, path.join('/repo', 'Sample.sln'));
+
+    assert(command.includes('dotnet run --project'), 'Solution Run Profile does not use dotnet run.');
+    assert(command.includes('--launch-profile'), 'Solution Run Profile command omits its launchSettings profile.');
+    assert(debugConfiguration.type === 'dotnet', 'Solution Debug Profile does not use the C# Dev Kit dotnet debugger.');
+    assert(debugConfiguration.projectPath === target.projectPath, 'Solution Debug Profile does not preserve the project path.');
+    assert(debugConfiguration.launchSettingsProfile === 'https', 'Solution Debug Profile does not preserve the launchSettings profile.');
+    assert(profile.targets.length === 1, 'Stored Run Profile normalization did not deduplicate project targets.');
+    assert(
+      !__test.normalizeStoredRunProfile({ ...profile, version: 2 }, path.join('/repo', 'Sample.sln')),
+      'Stored Run Profile accepted an unsupported schema version.'
+    );
+    assert(
+      !__test.normalizeStoredRunProfile(profile, path.join('/repo', 'Other.sln')),
+      'Stored Run Profile crossed solution boundaries.'
+    );
+    assert(
+      !__test.normalizeStoredRunProfile({
+        ...profile,
+        targets: [{ ...target, projectPath: 'relative/App.csproj' }]
+      }, path.join('/repo', 'Sample.sln')),
+      'Stored Run Profile accepted an untrusted relative project path.'
+    );
+    assert(__test.isRunnableLaunchProfile({ commandName: 'Project' }), 'Project launch profile was not considered runnable.');
+    assert(!__test.isRunnableLaunchProfile({ commandName: 'IISExpress' }), 'Unsupported IIS Express profile was considered runnable.');
+    assert(__test.deriveRunProfileName([target]).includes('Sample.Api'), 'Run Profile display name omits its project.');
+
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/solutionRunProfile.ts'), 'utf8');
+    assert(source.includes('solutionManager.solutionRunProfiles.v1'), 'Solution Run Profiles do not use a versioned workspace-state key.');
+    assert(source.includes('context.workspaceState.update'), 'Solution Run Profiles are not persisted in workspace state.');
+    assert(source.includes('vscode.debug.startDebugging'), 'Solution Debug Profiles are not started through the VS Code Debug API.');
+    assert(source.includes('dedicatedTask: true'), 'Multi-project Run Profiles do not request isolated task terminals.');
+
+    const manager = new SolutionRunProfileManager({
+      workspaceState: {
+        get: (key, fallback) => workspaceState.has(key) ? workspaceState.get(key) : fallback,
+        update: async (key, value) => {
+          workspaceState.set(key, value);
+        }
+      }
+    }, {
+      runCommand: (value, options) => {
+        terminalCommands.push({ value, options });
+      }
+    });
+    const solution = {
+      name: 'Sample',
+      path: path.join('/repo', 'Sample.sln')
+    };
+    const projects = [{
+      name: 'Sample.Api',
+      path: target.projectPath,
+      uri: 'file:///repo/src/Sample.Api/Sample.Api.csproj'
+    }];
+    const selectedProfile = await manager.selectProfile(solution, projects, new Set());
+
+    assert(selectedProfile.targets[0].launchProfile === 'https', 'Run Profile selection did not persist the selected launchSettings profile.');
+
+    await manager.run(solution, projects, new Set());
+    assert(terminalCommands.length === 1, 'Run Profile did not start its configured project.');
+    assert(terminalCommands[0].options.useTask, 'Run Profile did not use task-backed execution.');
+    assert(terminalCommands[0].options.dedicatedTask, 'Run Profile did not isolate its project terminal.');
+
+    await manager.debug(solution, projects, new Set());
+    assert(debugConfigurations.length === 1, 'Debug Profile did not start its configured project.');
+    assert(debugConfigurations[0].launchSettingsProfile === 'https', 'Debug Profile did not pass the selected launchSettings profile.');
+  } finally {
+    delete require.cache[solutionRunProfilePath];
+    delete require.cache[launchSettingsEditorPath];
     Module._load = originalLoad;
   }
 }

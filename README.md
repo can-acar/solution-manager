@@ -34,6 +34,11 @@ Important license note: if an earlier release was already distributed under Apac
   - Git status, diff, and log scoped to the project folder
   - Copy project path, relative path, project reference XML, or project name
   - Open project in editor, OS file explorer, or integrated terminal
+- Supports persistent solution Run Profiles:
+  - Select one or more loaded startup projects.
+  - Select a `launchSettings.json` Project profile for each startup project.
+  - Run projects concurrently in dedicated VS Code Task terminals.
+  - Debug projects through the C# Dev Kit `dotnet` debugger.
 - Includes a project properties panel with Application, NuGet, Assembly, Build, Inspection, Configuration, Imports, and Diagnostic Properties tabs.
 
 ### Requirements
@@ -41,6 +46,7 @@ Important license note: if an earlier release was already distributed under Apac
 - Visual Studio Code `1.90.0` or newer.
 - A workspace containing `.sln`, `.slnx`, or supported project files.
 - .NET SDK installed and available on `PATH` for `dotnet` and `dotnet ef` actions.
+- Microsoft C# Dev Kit is required for Solution Run Profile debugging.
 - Git installed for project-scoped Git actions.
 
 ### Usage
@@ -49,7 +55,9 @@ Important license note: if an earlier release was already distributed under Apac
 2. Open a folder that contains a `.sln` or `.slnx` file.
 3. Open the `Solution` view from the Activity Bar.
 4. Use Refresh if the solution tree does not appear immediately.
-5. Right-click a project to access build, NuGet, Git, EF Core, copy, open, and properties actions.
+5. Use `Select Run Profile...` from the Solution toolbar or solution context menu to configure startup projects.
+6. Use the Solution toolbar Run or Debug actions to start the active profile.
+7. Right-click a project to access build, NuGet, Git, EF Core, copy, open, and properties actions.
 
 ### Commands
 
@@ -60,6 +68,9 @@ Important license note: if an earlier release was already distributed under Apac
 - `Solution Manager: Add Project`
 - `Solution Manager: Build`
 - `Solution Manager: Test`
+- `Solution Manager: Select Run Profile...`
+- `Solution Manager: Run Active Profile`
+- `Solution Manager: Debug Active Profile`
 
 ### Project Properties
 
