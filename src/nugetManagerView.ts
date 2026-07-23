@@ -111,13 +111,15 @@ const NUGET_ORG_SOURCE: NuGetPackageSource = {
 class NuGetManagerView {
   private panel?: vscode.WebviewPanel;
   private projects: NuGetManagerProject[] = [];
+  private stateSubscription?: vscode.Disposable;
   private readonly protocolHost: NuGetProtocolHost;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly terminalRunner: TerminalRunner,
     private readonly getState: () => Promise<any>,
-    private readonly refresh: (options?: any) => Promise<void>
+    private readonly refresh: (options?: any) => Promise<void>,
+    private readonly onDidChangeState?: vscode.Event<void>
   ) {
     this.protocolHost = new NuGetProtocolHost(context.extensionPath);
   }
@@ -142,9 +144,15 @@ class NuGetManagerView {
         }
       );
       this.panel.onDidDispose(() => {
+        this.stateSubscription?.dispose();
+        this.stateSubscription = undefined;
         this.panel = undefined;
       }, undefined, this.context.subscriptions);
       this.panel.webview.onDidReceiveMessage((message) => this.handleMessage(message), undefined, this.context.subscriptions);
+
+      if (this.onDidChangeState) {
+        this.stateSubscription = this.onDidChangeState(() => { void this.repostPanelState(); });
+      }
     }
 
     this.panel.title = 'NuGet Manager';
@@ -158,6 +166,16 @@ class NuGetManagerView {
     const state = await this.getState();
     this.projects = mergeFreshProjectMetadata(this.projects, state);
     await this.postState(requestId);
+  }
+
+  private async repostPanelState(): Promise<void> {
+    if (!this.panel) {
+      return;
+    }
+
+    const state = await this.getState();
+    this.projects = mergeFreshProjectMetadata(this.projects, state);
+    await this.postState();
   }
 
   private async handleMessage(message: NuGetManagerMessage): Promise<void> {

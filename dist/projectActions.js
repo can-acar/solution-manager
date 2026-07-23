@@ -154,12 +154,12 @@ const PROJECT_ITEM_ELEMENT_NAMES = new Set([
     'AdditionalFiles'
 ]);
 class ProjectActions {
-    constructor(context, terminalRunner, refresh, getState) {
+    constructor(context, terminalRunner, refresh, getState, onDidChangeState) {
         this.context = context;
         this.terminalRunner = terminalRunner;
         this.refresh = refresh;
         this.getState = getState;
-        this.nugetManagerView = new nugetManagerView_1.NuGetManagerView(context, terminalRunner, getState, refresh);
+        this.nugetManagerView = new nugetManagerView_1.NuGetManagerView(context, terminalRunner, getState, refresh, onDidChangeState);
     }
     async addNewCSharpClass(node) {
         const project = getProjectItem(node);

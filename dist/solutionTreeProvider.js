@@ -63,9 +63,11 @@ class SolutionTreeProvider {
     static viewType = 'solutionManager.solutionView';
     constructor(context) {
         this.context = context;
+        this.onDidChangeTreeDataEmitter = new vscode.EventEmitter();
+        this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
         this.scanner = new workspaceScanner_1.WorkspaceScanner(context);
         this.terminalRunner = new terminalRunner_1.TerminalRunner();
-        this.projectActions = new projectActions_1.ProjectActions(context, this.terminalRunner, (options) => this.refresh(options), () => this.getState());
+        this.projectActions = new projectActions_1.ProjectActions(context, this.terminalRunner, (options) => this.refresh(options), () => this.getState(), this.onDidChangeTreeData);
         this.solutionActions = new solutionActions_1.SolutionActions(context, this.terminalRunner, {
             refresh: (options) => this.refresh(options),
             getState: () => this.getState(),
@@ -76,8 +78,6 @@ class SolutionTreeProvider {
             setUnloadedProjectUris: (uris) => this.setUnloadedProjectUris(uris)
         });
         this.fileExplorerActions = new fileExplorerActions_1.FileExplorerActions(() => this.refresh({ userVisible: false }));
-        this.onDidChangeTreeDataEmitter = new vscode.EventEmitter();
-        this.onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
         this.currentState = undefined;
         this.treeView = undefined;
         this.autoRefreshTimer = undefined;

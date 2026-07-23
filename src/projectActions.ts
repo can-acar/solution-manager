@@ -153,12 +153,12 @@ const PROJECT_ITEM_ELEMENT_NAMES = new Set([
 ]);
 
 class ProjectActions {
-  constructor(context, terminalRunner, refresh, getState) {
+  constructor(context, terminalRunner, refresh, getState, onDidChangeState) {
     this.context = context;
     this.terminalRunner = terminalRunner;
     this.refresh = refresh;
     this.getState = getState;
-    this.nugetManagerView = new NuGetManagerView(context, terminalRunner, getState, refresh);
+    this.nugetManagerView = new NuGetManagerView(context, terminalRunner, getState, refresh, onDidChangeState);
   }
 
   async addNewCSharpClass(node) {

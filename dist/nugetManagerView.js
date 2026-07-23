@@ -54,14 +54,17 @@ class NuGetManagerView {
     terminalRunner;
     getState;
     refresh;
+    onDidChangeState;
     panel;
     projects = [];
+    stateSubscription;
     protocolHost;
-    constructor(context, terminalRunner, getState, refresh) {
+    constructor(context, terminalRunner, getState, refresh, onDidChangeState) {
         this.context = context;
         this.terminalRunner = terminalRunner;
         this.getState = getState;
         this.refresh = refresh;
+        this.onDidChangeState = onDidChangeState;
         this.protocolHost = new nugetProtocolHost_1.NuGetProtocolHost(context.extensionPath);
     }
     async show(node) {
@@ -77,9 +80,14 @@ class NuGetManagerView {
                 retainContextWhenHidden: true
             });
             this.panel.onDidDispose(() => {
+                this.stateSubscription?.dispose();
+                this.stateSubscription = undefined;
                 this.panel = undefined;
             }, undefined, this.context.subscriptions);
             this.panel.webview.onDidReceiveMessage((message) => this.handleMessage(message), undefined, this.context.subscriptions);
+            if (this.onDidChangeState) {
+                this.stateSubscription = this.onDidChangeState(() => { void this.repostPanelState(); });
+            }
         }
         this.panel.title = 'NuGet Manager';
         this.panel.webview.html = this.createHtml(this.panel.webview);
@@ -91,6 +99,14 @@ class NuGetManagerView {
         const state = await this.getState();
         this.projects = mergeFreshProjectMetadata(this.projects, state);
         await this.postState(requestId);
+    }
+    async repostPanelState() {
+        if (!this.panel) {
+            return;
+        }
+        const state = await this.getState();
+        this.projects = mergeFreshProjectMetadata(this.projects, state);
+        await this.postState();
     }
     async handleMessage(message) {
         try {
